@@ -27,6 +27,8 @@ Le projet fournit des composants réutilisables pour les formulaires dans le dos
 11. `RhfCalendarInput` - Calendrier complet
 12. `RhfFileInput` - Upload de fichier
 13. `RhfInputColorPicker` - Sélecteur de couleur
+14. `RhfMultiSelectInput` - Sélection multiple avec recherche
+15. `RhfDynamicSelectInput` - Select avec création à la volée via modale
 
 ## Utilisation
 
