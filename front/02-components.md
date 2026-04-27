@@ -8,6 +8,7 @@ Le projet utilise **Shadcn/ui** comme base pour les composants UI. Tous les comp
 components/
 ├── ui/                    # Composants Shadcn de base
 ├── form/inputs/           # Wrappers React Hook Form
+├── modals/               # Modales réutilisables (EditModal, DeleteModal)
 ├── translation/           # Sélecteur de langue
 └── loaders/              # Loaders (auth, page)
 ```
@@ -31,7 +32,7 @@ Composants de base Shadcn, tous personnalisés avec les variables du thème.
 - **card** - Cartes de contenu
 - **checkbox** - Cases à cocher
 - **command** - Command palette (recherche)
-- **dialog** - Modales
+- **dialog** - Composant Dialog Shadcn de base (voir `modals/` pour les modals réutilisables)
 - **drawer** - Tiroirs latéraux (mobile)
 - **dropdown-menu** - Menus déroulants
 - **form** - Wrapper formulaire (React Hook Form)
@@ -384,6 +385,133 @@ Dans `rhf-dynamic-select-input.tsx`, ajouter le nouveau cas dans le bloc conditi
     onCreated={(id) => onChange(id)}
   />
 ) : null}
+```
+
+---
+
+## Modales
+
+**Dossier :** `src/components/modals/`
+
+Deux composants encapsulent les cas d'usage les plus courants de modale : édition et suppression.
+
+---
+
+### EditModal
+
+**Fichier :** `src/components/modals/edit-modal.tsx`
+
+Modale d'édition qui intègre directement le wrapper `Form`, l'affichage de l'erreur racine (`errors.root`), et les boutons Annuler / Enregistrer.
+
+#### Props
+
+| Prop | Type | Description |
+|---|---|---|
+| `open` | `boolean` | État d'ouverture |
+| `onOpenChange` | `(open: boolean) => void` | Appelé à chaque changement d'état (Escape, clic backdrop) |
+| `title` | `ReactNode` | Titre affiché dans le header |
+| `methods` | `UseFormReturn<T>` | Instance `useForm` — gère l'erreur root et le submit |
+| `onSubmit` | `(e?) => void` | Handler de soumission (`handleSubmit(...)`) |
+| `onCancel` | `() => void` | Appelé par le bouton Annuler |
+| `children` | `ReactNode` | Champs du formulaire |
+| `formClassName` | `string?` | Surcharge du `className` du `div` qui entoure les champs (défaut : `flex flex-col gap-4 py-2`) |
+| `cancelLabel` | `ReactNode?` | Override du label Annuler (défaut i18n : `"Annuler"`) |
+| `submitLabel` | `ReactNode?` | Override du label Enregistrer (défaut i18n : `"Enregistrer"`) |
+| `loading` | `boolean?` | Spinner sur le bouton de soumission |
+| `disabled` | `boolean?` | Désactive le bouton de soumission |
+| `onOpenAutoFocus` | `ComponentProps<DialogContent>['onOpenAutoFocus']?` | Contrôle le focus au montage |
+
+#### Utilisation
+
+```tsx
+import { EditModal } from '@/components/modals/edit-modal';
+
+<EditModal
+  open={open}
+  onOpenChange={(next) => { if (!next) onClose(); }}
+  title="Modifier l'élément"
+  methods={methods}
+  onSubmit={handleSubmit(onSubmit)}
+  onCancel={onClose}
+  loading={isPending || isSubmitting}
+  disabled={isPending || isSubmitting}
+>
+  <RhfTextInput
+    control={methods.control}
+    name="name"
+    label="Nom"
+    required
+    className="max-w-full!"
+  />
+</EditModal>
+```
+
+**Comportement :**
+- Si `methods.formState.errors.root` est défini, une `Alert` destructive s'affiche au-dessus des champs.
+- Le footer (Annuler + Enregistrer) n'est affiché que si `onSubmit` **et** `onCancel` sont tous les deux définis.
+- `onOpenChange` et `onCancel` doivent tous les deux appeler `onClose()` — le premier gère la fermeture via Escape/backdrop, le second via le bouton Annuler.
+
+---
+
+### DeleteModal
+
+**Fichier :** `src/components/modals/delete-modal.tsx`
+
+Modale de confirmation de suppression basée sur `AlertDialog`. Affiche un titre, une description, et optionnellement une erreur serveur.
+
+#### Props
+
+| Prop | Type | Description |
+|---|---|---|
+| `open` | `boolean` | État d'ouverture |
+| `onClose` | `() => void` | Appelé à la fermeture (bouton Annuler, Escape, backdrop) |
+| `title` | `ReactNode` | Titre de la confirmation |
+| `description` | `ReactNode` | Texte décrivant l'action destructive |
+| `error` | `string \| null?` | Erreur serveur à afficher dans une Alert |
+| `onConfirm` | `() => void` | Appelé au clic sur le bouton de confirmation |
+| `isConfirming` | `boolean?` | Spinner sur le bouton de confirmation |
+| `cancelLabel` | `ReactNode?` | Override du label Annuler (défaut i18n : `"Annuler"`) |
+| `confirmLabel` | `ReactNode?` | Override du label Supprimer (défaut i18n : `"Supprimer"`) |
+
+#### Utilisation
+
+```tsx
+import { DeleteModal } from '@/components/modals/delete-modal';
+
+const [error, setError] = useState<string | null>(null);
+
+<DeleteModal
+  open={open}
+  onClose={onClose}
+  title="Suppression du projet"
+  description="Êtes-vous sûr de vouloir supprimer ce projet et toutes ses données ?"
+  error={error}
+  onConfirm={handleConfirm}
+  isConfirming={isPending}
+/>
+```
+
+**Pattern complet avec gestion d'erreur :**
+
+```tsx
+const handleConfirm = () => {
+  setError(null);
+  deleteItem(
+    { data: { id: item.id } },
+    {
+      onSuccess: () => {
+        showSuccessToast('Élément supprimé.');
+        queryClient.invalidateQueries({ queryKey: ... });
+        onClose();
+      },
+      onError: (error) => {
+        const errData = parseAxiosError(error, t('common:error.500', { ... }));
+        if (errData.statusCode === 401) return;
+        setError(errData.message);
+      },
+    }
+  );
+};
 ```
 
 ---
