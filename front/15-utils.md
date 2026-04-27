@@ -157,74 +157,43 @@ try {
 
 ## Métadonnées (SEO)
 
-Les utilitaires de métadonnées permettent de gérer le SEO de manière cohérente dans toute l'application Next.js.
+Toutes les métadonnées sont centralisées dans `src/utils/metadata.ts`. Ce fichier exporte la configuration du site, les metadata de chaque page et les fonctions utilitaires.
+
+### getPageMetadata
+
+Fonction principale à utiliser dans chaque `page.tsx`. Récupère les metadata depuis `PAGES_METADATA`. Lève une erreur si la clé est inconnue.
+
+```tsx
+import { getPageMetadata } from '@/utils/metadata';
+
+export const metadata = getPageMetadata('login');
+```
+
+> Une règle ESLint bloquante vérifie que chaque `page.tsx` sous `src/app/` appelle `getPageMetadata`. Le build échoue si absent.
+
+### SITE_CONFIG
+
+Constante exportée contenant les valeurs globales du site (nom, titre, description, locale, ogImage, authors).
 
 ### generateLayoutMetadata
 
-Génère les métadonnées de base pour le layout racine de l'application. Cette fonction :
-- Définit les métadonnées par défaut (titre, description, mots-clés)
-- Configure les langues alternatives
-- Définit les règles pour les robots d'indexation
-- Utilise les variables d'environnement pour les URLs
+Réservé au `layout.tsx` racine. Génère les métadonnées de base sans URL canonique.
 
 ```tsx
 import { generateLayoutMetadata } from '@/utils/metadata';
-import { Metadata } from 'next';
 
-// Dans layout.tsx
+// Dans layout.tsx uniquement
 export const metadata: Metadata = generateLayoutMetadata();
-```
-
-### generateMetadata
-
-Génère des métadonnées personnalisées pour une page spécifique, avec URL et balises Open Graph. Cette fonction :
-- Étend les métadonnées de base avec des informations spécifiques à la page
-- Gère les URLs pour éviter le contenu dupliqué
-- Configure les balises Open Graph pour les partages sur les réseaux sociaux
-- Permet de personnaliser les règles d'indexation par page
-
-```tsx
-import { generateMetadata } from '@/utils/metadata';
-import { Metadata } from 'next';
-
-// Dans une page.tsx
-export const metadata: Metadata = generateMetadata({
-  title: 'Titre de la page',
-  description: 'Description détaillée de la page pour le SEO',
-  canonical: '/chemin-de-page',
-  ogImage: '/images/og-image.jpg',
-  ogTitle: 'Titre pour les réseaux sociaux'
-});
-```
-
-### generateNoIndexMetadata
-
-Génère des métadonnées pour les pages qui ne doivent pas être indexées par les moteurs de recherche. Particulièrement utile pour :
-- Les pages privées (profil, tableau de bord)
-- Les pages de processus (paiement, inscription)
-- Les pages temporaires ou en développement
-
-```tsx
-import { generateNoIndexMetadata } from '@/utils/metadata';
-import { Metadata } from 'next';
-
-// Dans une page privée
-export const metadata: Metadata = generateNoIndexMetadata({
-  title: 'Page privée',
-  description: 'Cette page ne doit pas être indexée',
-  canonical: '/page-privee'
-});
 ```
 
 ### getCanonicalUrl
 
-Convertit un chemin relatif en URL absolue, en utilisant la base URL configurée.
+Convertit un chemin relatif en URL absolue.
 
 ```tsx
 import { getCanonicalUrl } from '@/utils/metadata';
 
-// Obtenir l'URL complète
 const canonicalUrl = getCanonicalUrl('/ma-page'); // https://example.com/ma-page
 ```
 
-Pour plus d'informations sur l'utilisation des métadonnées, consultez le guide [17-seo-metadata.md](./17-seo-metadata.md).
+Pour plus d'informations, consultez le guide [17-seo-metadata.md](./17-seo-metadata.md).

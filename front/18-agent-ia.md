@@ -50,7 +50,7 @@ Avant toute action, **lire les documents de référence correspondants** dans `d
 | 14 | [Hooks](./14-hooks.md) | useAppRouter, useZodI18n, useIsScreenBelowBreakpoint |
 | 15 | [Utils](./15-utils.md) | parseAxiosError, cn(), metadata, avatar, date |
 | 16 | [Config](./16-config.md) | Variables d'env, constantes, scripts, next.config |
-| 17 | [SEO](./17-seo-metadata.md) | generateMetadata, noIndex, sitemap, og |
+| 17 | [SEO](./17-seo-metadata.md) | getPageMetadata, SITE_CONFIG, PAGES_METADATA, sitemap, og |
 
 ---
 
@@ -93,7 +93,7 @@ Avant toute implémentation, répondre à ces questions :
 | Appels API | Hooks Orval à utiliser | `src/api/generated/` |
 | Traductions | Nouveau namespace / Nouveau fichier | `public/locales/` |
 | Navigation | Ajouter dans `nav.tsx` | Si nouvelle page accessible |
-| SEO | `generateMetadata` ou `generateNoIndexMetadata` | Selon indexation |
+| SEO | `getPageMetadata('clé')` | Obligatoire — clé à ajouter dans `PAGES_METADATA` (`src/utils/metadata.ts`) |
 
 ### 1.3 Lire le code existant
 
@@ -122,7 +122,7 @@ Régénérer dès que :
 
 ### 2.2 Configuration Orval
 
-Orval est configuré via `orval.config.ts` à la racine du frontend. La variable d'environnement `SWAGGER_JSON` (dans `.env`, `.env.local` ou `.env.production`) pointe vers le spec OpenAPI de l'API (ex: URL de l'API + `/api-json` ou chemin local).
+Orval est configuré via `orval.config.ts` à la racine du frontend. La variable d'environnement `SWAGGER_JSON` (dans `.env`, `.env.local` ou `.env.production`) pointe vers le spec OpenAPI de l'API avec le token d'accès (ex: `{API_URL}/api-json?token={SWAGGER_TOKEN}`). `SWAGGER_TOKEN` doit également être défini — une erreur est levée si absent.
 
 ### 2.3 Lancer la génération
 
@@ -178,14 +178,10 @@ src/sections/{feature}/
 **Couche 1 — `page.tsx` :** fine, uniquement la metadata et l'import de la view.
 
 ```tsx
-import { generateNoIndexMetadata } from '@/utils/metadata';
+import { getPageMetadata } from '@/utils/metadata';
 import FeatureView from '@/sections/feature/view/feature-view';
 
-export const metadata = generateNoIndexMetadata({
-  title: 'Titre de la page',
-  description: 'Description SEO',
-  canonical: '/feature',
-});
+export const metadata = getPageMetadata('feature');
 
 export default function FeaturePage() {
   return <FeatureView />;
@@ -247,32 +243,36 @@ Le layout `(unlogged)/layout.tsx` applique automatiquement `<UnloggedGuard>`.
 
 ### 3.3 Metadata SEO
 
-| Type de page | Fonction | Indexée |
-|---|---|---|
-| Page publique (landing, articles) | `generateMetadata` | ✅ |
-| Page auth, privée, outil | `generateNoIndexMetadata` | ❌ |
-| Root layout uniquement | `generateLayoutMetadata` | — |
+Toutes les metadata de pages sont centralisées dans `PAGES_METADATA` dans `src/utils/metadata.ts`.
 
-```tsx
-// Page publique indexée — utiliser l'alias generateMeta pour éviter le conflit avec generateMetadata de Next.js
-import { generateMetadata as generateMeta } from '@/utils/metadata';
+**Étape 1** — Ajouter la clé dans `PAGES_METADATA` :
 
-export const metadata = generateMeta({
+```typescript
+// Page publique indexée
+maPage: generateMetadata({
   title: 'Mon titre',
   description: 'Description',
   canonical: '/ma-page',
   ogImage: '/images/og.jpg', // optionnel
-});
+}),
 
 // Page privée / auth
-import { generateNoIndexMetadata } from '@/utils/metadata';
-
-export const metadata = generateNoIndexMetadata({
+maPage: generateNoIndexMetadata({
   title: 'Mon titre',
   description: 'Description',
   canonical: '/ma-page',
-});
+}),
 ```
+
+**Étape 2** — Appeler `getPageMetadata` dans la page :
+
+```tsx
+import { getPageMetadata } from '@/utils/metadata';
+
+export const metadata = getPageMetadata('maPage');
+```
+
+> Une règle ESLint bloquante vérifie que chaque `page.tsx` appelle `getPageMetadata`. Le build échoue si absent. Le root layout utilise `generateLayoutMetadata()` directement (exception).
 
 > **Si la page est accessible via le header**, ajouter le chemin dans `APP_PATHS` (`src/constants/constants.ts`) et utiliser cette constante dans `nav.tsx` — éviter les chemins en dur (certaines pages existantes comme `/private` n'ont pas encore été migrées vers `APP_PATHS`, c'est la cible à viser).
 
@@ -808,7 +808,8 @@ Les titres des entrées de navigation sont traduits via `useTranslation('header'
 ### 3. Pages et routing
 - [ ] Page placée dans le bon groupe de routes (`(logged)`, `(unlogged)`, ou racine)
 - [ ] Structure en 3 couches respectée (`page.tsx` → `*-view.tsx` → `*-form.tsx`)
-- [ ] `generateMetadata` ou `generateNoIndexMetadata` utilisé selon l'indexation
+- [ ] Clé ajoutée dans `PAGES_METADATA` (`src/utils/metadata.ts`) avec `generateMetadata` ou `generateNoIndexMetadata` selon l'indexation
+- [ ] `getPageMetadata('clé')` exporté depuis `page.tsx`
 - [ ] `canonical` correct dans la metadata
 
 ### 4. Implémentation
@@ -842,7 +843,7 @@ Les titres des entrées de navigation sont traduits via `useTranslation('header'
 - [ ] Si la feature ajoute un **nouvel endpoint API** qui ne doit pas déclencher le refresh/retry automatique (login, logout, reset-password…) : d'abord ajouter le chemin dans `API_PATHS` (ex: `API_PATHS.MON_DOMAINE.ACTION`), puis l'ajouter dans `ROUTES_WITHOUT_RETRY` via `API_PATHS.XXX` dans `constants.ts`
 
 ### 7. SEO — sitemap & robots (uniquement si nouvelle page)
-> Les metadata (`generateMetadata` / `generateNoIndexMetadata`) sont obligatoires sur chaque `page.tsx` — elles sont vérifiées à l'étape 3.
+> `getPageMetadata('clé')` est obligatoire sur chaque `page.tsx` — vérifié par une règle ESLint bloquante (build échoue si absent).
 
 - [ ] Page privée : ajouter le chemin dans `exclude` et `robotsTxtOptions.policies[0].disallow` de `next-sitemap.config.js` (ex: pour `/ma-feature`, ajouter `'/ma-feature*'` dans `exclude` et `'/ma-feature'` dans `disallow`)
 - [ ] Page publique indexée : rien à faire (inclusion automatique dans le sitemap)

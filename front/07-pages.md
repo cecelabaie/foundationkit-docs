@@ -83,7 +83,7 @@ Les routes sont organisées en groupes pour appliquer des layouts et des guards 
 
 - **Logout** (`/(logged)/logout/page.tsx`)
   - Page de déconnexion
-  - Utilise `generateNoIndexMetadata` pour éviter l'indexation par les moteurs de recherche
+  - Utilise `getPageMetadata('logout')` pour éviter l'indexation par les moteurs de recherche
 
 ### Profil utilisateur
 
@@ -120,11 +120,10 @@ Les routes sont organisées en groupes pour appliquer des layouts et des guards 
 
 Les pages utilisent des utilitaires pour générer des métadonnées optimisées pour le SEO :
 
-- `generateMetadata` : Génère les métadonnées standard pour les pages indexables
-- `generateNoIndexMetadata` : Génère des métadonnées pour les pages qui ne doivent pas être indexées
-- `generateLayoutMetadata` : Génère les métadonnées de base pour le layout racine
+- `getPageMetadata('clé')` : Récupère les métadonnées centralisées pour la page — **obligatoire dans chaque `page.tsx`**, vérifié par une règle ESLint bloquante
+- `generateLayoutMetadata` : Génère les métadonnées de base pour le layout racine (layout uniquement)
 
-Chaque page définit ses propres métadonnées avec :
+Toutes les metadata de pages sont définies dans `PAGES_METADATA` dans `src/utils/metadata.ts`. Chaque page contient :
 - Titre
 - Description
 - URL canonique

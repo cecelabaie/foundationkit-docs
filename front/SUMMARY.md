@@ -68,13 +68,13 @@ Présente le composant `Providers` et les différents contextes React utilisés 
 Présente les hooks personnalisés développés pour l'application : `useAppRouter` (navigation avec barre de progression), `useIsScreenBelowBreakpoint` (détection de breakpoints), `useZodI18n` (mise à jour des messages d'erreur lors du changement de langue). Détaille chaque hook et son utilisation.
 
 ### Utils
-Présente les fonctions utilitaires disponibles : manipulation de données (`getAvatar`, `hexToRgba`, `normalizeDate`), gestion des erreurs (`parseAxiosError`, `makeValidationErrorResponse`), SEO (`generateLayoutMetadata`, `generateMetadata`, `generateNoIndexMetadata`, `getCanonicalUrl`). Détaille chaque utilitaire et son utilisation.
+Présente les fonctions utilitaires disponibles : manipulation de données (`getAvatar`, `hexToRgba`, `normalizeDate`), gestion des erreurs (`parseAxiosError`, `makeValidationErrorResponse`), SEO (`getPageMetadata`, `generateLayoutMetadata`, `SITE_CONFIG`, `getCanonicalUrl`). Détaille chaque utilitaire et son utilisation.
 
 ### Config
 Présente les différentes configurations du projet frontend : `next.config.ts` (optimisations performance et sécurité), `tsconfig.json` (configuration TypeScript), `tailwind.config.ts` (configuration Tailwind), `orval.config.ts` (génération API), scripts npm, variables d'environnement et constantes.
 
 ### Guide SEO & Métadonnées
-Guide pratique pour la gestion des métadonnées et URLs canoniques. Explique les utilitaires `generateMetadata`, `generateNoIndexMetadata` et `generateLayoutMetadata`, liste les règles d'indexation par page, et donne les bonnes pratiques pour les titres, descriptions et Open Graph.
+Guide pratique pour la gestion des métadonnées et URLs canoniques. Explique le système centralisé (`SITE_CONFIG`, `PAGES_METADATA`, `getPageMetadata`), liste les clés par page, et donne les bonnes pratiques pour les titres, descriptions et Open Graph.
 
 ### Guide IA — Contribuer au Frontend
 Guide destiné aux agents IA pour créer, modifier ou étendre des features du frontend. Définit un workflow structuré en 6 étapes : analyse & découpage, régénération Orval, structure de la page (3 couches), implémentation des composants (formulaires, appels API, auth, toasts, navigation, responsive), traductions, et navigation. Inclut une checklist de validation complète.
