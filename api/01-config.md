@@ -318,7 +318,7 @@ Exclut les fichiers de test et le dossier dist du build final.
 
 ## Swagger
 
-La documentation Swagger est générée automatiquement et accessible à l'URL `/api` de l'API.
+La documentation Swagger est générée automatiquement et protégée par un token passé en query string (`?token={SWAGGER_TOKEN}`).
 
 ### Configuration dans main.ts
 
@@ -358,8 +358,8 @@ SwaggerModule.setup('api', app, documentFactory);
 
 ### Accès
 
-- **URL locale** : `{API_URL}:{API_PORT}/api`
-- **JSON spec** : `{API_URL}:{API_PORT}/api-json`
+- **URL locale** : `{API_URL}:{API_PORT}/api?token={SWAGGER_TOKEN}`
+- **JSON spec** : `{API_URL}:{API_PORT}/api-json?token={SWAGGER_TOKEN}`
 
 ## Cookies et Sessions
 

@@ -252,7 +252,8 @@ L'application utilise plusieurs variables d'environnement définies dans un fich
 | `APP_PORT` | Port de l'application frontend Next.js | Doit correspondre au port défini dans le script `dev` du `package.json` (option `-p`) |
 | `NEXT_PUBLIC_APP_URL` | URL de l'application frontend | Accessible côté client, utilisée pour les URL absolues |
 | `NEXT_PUBLIC_SERVER_URL` | URL du serveur backend | Accessible côté client, utilisée pour les appels API |
-| `SWAGGER_JSON` | URL du fichier Swagger | Utilisée par Orval pour générer le code TypeScript |
+| `SWAGGER_TOKEN` | Token d'accès au Swagger | Requis pour accéder aux routes Swagger protégées côté API |
+| `SWAGGER_JSON` | URL du fichier Swagger (inclut `?token={SWAGGER_TOKEN}`) | Utilisée par Orval pour générer le code TypeScript |
 | `NODE_ENV` | Environnement d'exécution (development, production) | Détermine les optimisations et comportements spécifiques à l'environnement |
 
 ### Sécurité des variables d'environnement

@@ -76,19 +76,48 @@ Le projet utilise le plugin Swagger de NestJS configuré dans `nest-cli.json` :
 
 ## Accès à la documentation
 
+### Protection par token
+
+L'accès au Swagger est restreint via un token passé en query string. Sans token valide, les routes Swagger retournent une réponse `404 Not Found` identique à celle d'une route inexistante — ce qui ne révèle pas l'existence de la documentation.
+
+Le token est configuré dans la variable d'environnement `SWAGGER_TOKEN` (côté API).
+
+```typescript
+// main.ts
+const swaggerToken = configService.getOrThrow<string>('SWAGGER_TOKEN');
+const swaggerPaths = ['/api', '/api-json', '/api-yaml'];
+
+app.use(swaggerAuthMiddleware(swaggerToken, swaggerPaths));
+```
+
+La logique est externalisée dans `src/middlewares/swagger-auth.middleware.ts` :
+
+```typescript
+// src/middlewares/swagger-auth.middleware.ts
+export function swaggerAuthMiddleware(swaggerToken: string, swaggerPaths: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const normalizedPath = req.path.replace(/\/$/, '') || '/';
+    if (!swaggerPaths.includes(normalizedPath)) return next();
+    if (req.query['token'] === swaggerToken) return next();
+    throw new NotFoundException(
+      ResponseUtil.error(HttpStatus.NOT_FOUND, 'Cannot GET ' + normalizedPath, 'Not Found'),
+    );
+  };
+}
+```
+
 ### Interface web
 
 La documentation Swagger est accessible via l'interface web :
 
-- **URL locale** : `{API_URL}:{API_PORT}/api`
-- **URL de production** : `{API_URL}:{API_PORT}/api`
+- **URL locale** : `{API_URL}:{API_PORT}/api?token={SWAGGER_TOKEN}`
 
 ### Export de la spécification
 
 La spécification OpenAPI peut être exportée :
 
-- **JSON** : `{API_URL}:{API_PORT}/api-json`
-- **YAML** : `{API_URL}:{API_PORT}/api-yaml`
+- **JSON** : `{API_URL}:{API_PORT}/api-json?token={SWAGGER_TOKEN}`
+- **YAML** : `{API_URL}:{API_PORT}/api-yaml?token={SWAGGER_TOKEN}`
 
 ## Décorateurs Swagger utilisés
 
@@ -421,17 +450,17 @@ La documentation Swagger est principalement en français, mais les messages d'er
 npm run start:dev
 
 # Accéder à Swagger
-{API_URL}:{API_PORT}/api
+{API_URL}:{API_PORT}/api?token={SWAGGER_TOKEN}
 ```
 
 ### Export de la documentation
 
 ```bash
 # Exporter en JSON
-curl {API_URL}:{API_PORT}/api-json > api-docs.json
+curl "{API_URL}:{API_PORT}/api-json?token={SWAGGER_TOKEN}" > api-docs.json
 
 # Exporter en YAML
-curl {API_URL}:{API_PORT}/api-yaml > api-docs.yaml
+curl "{API_URL}:{API_PORT}/api-yaml?token={SWAGGER_TOKEN}" > api-docs.yaml
 ```
 
 ## Intégration avec le frontend
@@ -445,7 +474,7 @@ Le projet utilise `orval` pour générer automatiquement le client TypeScript à
 export default {
   api: {
     input: {
-      target: '{API_URL}:{API_PORT}/api-json',
+      target: '{API_URL}:{API_PORT}/api-json?token={SWAGGER_TOKEN}',
     },
     output: {
       target: './src/api/generated',

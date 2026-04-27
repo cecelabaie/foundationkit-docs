@@ -20,7 +20,8 @@ La configuration se trouve dans `orval.config.ts` à la racine du projet :
 
 ### Points clés de la configuration
 
-- **SWAGGER_JSON** : URL ou chemin vers le fichier OpenAPI. Chargé depuis le premier fichier trouvé dans l'ordre : `.env.production`, `.env.local`, `.env`
+- **SWAGGER_TOKEN** : Token d'accès à la documentation Swagger (protégée côté API). Requis — une erreur est levée au démarrage si absent.
+- **SWAGGER_JSON** : URL vers le fichier OpenAPI, incluant le token : `{API_URL}/api-json?token={SWAGGER_TOKEN}`. Chargé depuis le premier fichier trouvé dans l'ordre : `.env.production`, `.env.local`, `.env`
 - **mode: 'tags-split'** : Génère des fichiers séparés par tags OpenAPI
 - **client: 'react-query'** : Génère des hooks React Query
 - **mutator personnalisé** : Utilise un client Axios personnalisé
