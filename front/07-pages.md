@@ -17,8 +17,11 @@ src/app/
   │   ├── layout.tsx        # Layout avec UnloggedGuard
   │   ├── login/            # Page de connexion
   │   ├── register/         # Page d'inscription
-  │   ├── verify-account/   # Vérification de compte
-  │   └── (reset-password)/ # Groupe pour la réinitialisation du mot de passe
+  │   ├── (verify-account)/ # Sous-groupe pour la vérification de compte
+  │   │   ├── layout.tsx    # Layout avec VerifyAccountGuard
+  │   │   └── verify-account/
+  │   │       └── page.tsx
+  │   └── (reset-password)/ # Sous-groupe pour la réinitialisation du mot de passe
   │       └── forgot-password/
   │           ├── page.tsx              # Demande de réinitialisation
   │           └── new-password/         # Création d'un nouveau mot de passe
@@ -28,7 +31,12 @@ src/app/
   ├── (public)/             # Pages publiques accessibles à tous
   │   ├── layout.tsx        # Layout public (sans guard)
   │   ├── page.tsx          # Page d'accueil (/)
-  │   └── contact/          # Page de contact
+  │   ├── contact/          # Page de contact
+  │   ├── terms-of-service/ # Conditions générales de vente
+  │   ├── terms-of-use/     # Conditions générales d'utilisation
+  │   ├── legal-mentions/   # Mentions légales
+  │   ├── privacy-policy/   # Politique de confidentialité
+  │   └── cookies/          # Politique de cookies
   │
   ├── layout.tsx            # Layout racine
   └── not-found.tsx         # Page 404 personnalisée
@@ -38,22 +46,26 @@ src/app/
 
 ### Guards
 
-L'application utilise trois guards pour protéger les routes :
+L'application utilise quatre guards pour protéger les routes :
 
 1. **AuthGuard** (`src/guards/authGuard.tsx`)
    - Protège les routes nécessitant une authentification
-   - Vérifie la validité du token à chaque changement de route
    - Redirige vers `/login?returnTo=...` si l'utilisateur n'est pas connecté
    - Supporte la vérification des rôles (`requiredRoles`)
 
 2. **UnloggedGuard** (`src/guards/unloggedGuard.tsx`)
    - Protège les routes accessibles uniquement aux utilisateurs non connectés
-   - Redirige vers l'accueil si l'utilisateur est déjà connecté
+   - Redirige vers `returnTo` ou `/` si l'utilisateur est déjà connecté
 
 3. **ForgotPasswordGuard** (`src/guards/forgotPasswordGuard.tsx`)
    - Protège la page de nouveau mot de passe
    - Vérifie la validité du token de réinitialisation via l'API
    - Redirige vers `/forgot-password` si le token est invalide ou expiré
+
+4. **VerifyAccountGuard** (`src/guards/verifyAccountGuard.tsx`)
+   - Protège la page de vérification de compte
+   - Lit `userId` et `token` dans les query params et appelle l'API au montage
+   - Redirige systématiquement vers `/login` une fois la vérification terminée
 
 ### Groupes de routes
 
@@ -61,6 +73,7 @@ L'application utilise trois guards pour protéger les routes :
 - **`(unlogged)`** : Routes pour utilisateurs non connectés (UnloggedGuard)
 - **`(public)`** : Routes publiques sans guard
 - **`(reset-password)`** : Sous-groupe avec ForgotPasswordGuard
+- **`(verify-account)`** : Sous-groupe avec VerifyAccountGuard
 
 ## Pages principales
 
@@ -92,6 +105,11 @@ Toutes ces pages utilisent `AuthPageLayout` (`src/layout/auth-page-layout.tsx`) 
 
 - **Contact** (`/contact`) : Formulaire/informations de contact
 - **Not Found** (`/not-found`) : Page 404 avec illustration et retour à l'accueil
+- **Terms of Service** (`/terms-of-service`) : Conditions générales de vente
+- **Terms of Use** (`/terms-of-use`) : Conditions générales d'utilisation
+- **Legal Mentions** (`/legal-mentions`) : Mentions légales
+- **Privacy Policy** (`/privacy-policy`) : Politique de confidentialité
+- **Cookies** (`/cookies`) : Politique de cookies
 
 ## Métadonnées et SEO
 

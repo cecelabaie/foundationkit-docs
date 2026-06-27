@@ -20,13 +20,20 @@ Le `AuthContext` fournit les fonctionnalités d'authentification et de gestion d
 import { useAuth } from '@/contexts/AuthContext';
 
 function MyComponent() {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) return <Loader />;
-  
+  const { user, isLoadingUser, isRefreshingSession, refetchMe } = useAuth();
+
+  if (isLoadingUser) return <Loader />;
+
   return user ? <p>Connecté en tant que {user.firstName}</p> : <p>Non connecté</p>;
 }
 ```
+
+| Valeur | Description |
+|--------|-------------|
+| `user` | Données de l'utilisateur connecté (`UserProfileDTO`), `undefined` si non connecté |
+| `isLoadingUser` | Vrai pendant le premier chargement du profil |
+| `isRefreshingSession` | Vrai pendant un rafraîchissement de token en cours |
+| `refetchMe` | Force un rechargement du profil depuis l'API |
 
 Pour une documentation complète sur le système d'authentification et la gestion de session, consultez [session.md](./12-session.md).
 

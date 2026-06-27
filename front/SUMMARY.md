@@ -59,16 +59,16 @@ Explique comment utiliser les formulaires avec React Hook Form et Zod, en utilis
 Explique comment gérer les appels API et la récupération de données avec React Query et les hooks générés par Orval. Détaille les hooks générés, React Query, le mutator Axios, la gestion des erreurs, le retry automatique et la gestion des 401.
 
 ### Gestion de la session
-Présente le système de gestion de session avec AuthContext, Guards, QueryClient et le flag de session. La session est stateless (cookies HTTP-only côté backend). Détaille l'AuthContext, les guards, le QueryClient et le rafraîchissement automatique du token.
+Présente le système de gestion de session avec AuthContext, Guards et QueryClient. La session est stateless (cookies HTTP-only côté backend). Détaille l'AuthContext, les quatre guards (AuthGuard, UnloggedGuard, ForgotPasswordGuard, VerifyAccountGuard), le QueryClient et le rafraîchissement automatique du token.
 
 ### Contexts
 Présente le composant `Providers` et les différents contextes React utilisés pour gérer l'état global : AuthContext (authentification), ThemeSampleContext (thème), ReactQueryDevtoolsClient (outils de développement). Détaille l'ordre d'imbrication des providers et chaque contexte.
 
 ### Hooks
-Présente les hooks personnalisés : `useAppRouter` (navigation avec barre de progression), `useIsScreenBelowBreakpoint` (détection de breakpoints : utilisé pour le responsive mobile/desktop dans les vues), `useZodI18n` (messages d'erreur lors du changement de langue).
+Présente les hooks personnalisés : `useAppRouter` (navigation avec barre de progression), `useIsScreenBelowBreakpoint` (détection de breakpoints : utilisé pour le responsive mobile/desktop dans les vues), `useZodI18n` (messages d'erreur lors du changement de langue), `useFileOpen` et `useFileDownload` (récupération de fichiers protégés via AXIOS_INSTANCE avec refresh token automatique).
 
 ### Utils
-Présente les fonctions utilitaires disponibles : manipulation de données (`hexToRgba`, `normalizeDate`), gestion des erreurs (`parseAxiosError`, `makeValidationErrorResponse`), SEO (`getPageMetadata`, `generateLayoutMetadata`, `SITE_CONFIG`).
+Présente les fonctions utilitaires disponibles : manipulation de données (`hexToRgba`, `normalizeDate`), gestion des erreurs (`handleServerErrors`, `displayError`, `mapFieldsErrors`, `parseAxiosError`, `makeValidationErrorResponse`), SEO (`getPageMetadata`, `generateLayoutMetadata`, `SITE_CONFIG`).
 
 ### Config
 Présente les différentes configurations du projet frontend : `next.config.ts`, `tsconfig.json`, `orval.config.ts`, scripts npm, variables d'environnement et constantes.

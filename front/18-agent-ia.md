@@ -62,10 +62,10 @@ Avant toute action, **lire les documents de référence correspondants** dans `d
 | 09 | [Generation](./09-generation.md) | Orval, hooks générés, types, Zod schemas |
 | 10 | [Formulaires](./10-formulaires.md) | React Hook Form, Zod, inputs RHF, erreurs |
 | 11 | [Data](./11-data.md) | React Query, hooks Orval, gestion des erreurs |
-| 12 | [Session](./12-session.md) | AuthContext, guards, flag_session, refresh token |
+| 12 | [Session](./12-session.md) | AuthContext, guards, refresh token, callbacks QueryClient |
 | 13 | [Contexts](./13-contexts.md) | AuthContext, ThemeSampleContext, providers |
-| 14 | [Hooks](./14-hooks.md) | useAppRouter, useZodI18n, useIsScreenBelowBreakpoint |
-| 15 | [Utils](./15-utils.md) | parseAxiosError, cn(), metadata, hexToRgba, date |
+| 14 | [Hooks](./14-hooks.md) | useAppRouter, useZodI18n, useIsScreenBelowBreakpoint, useFileOpen, useFileDownload |
+| 15 | [Utils](./15-utils.md) | handleServerErrors, displayError, mapFieldsErrors, parseAxiosError, cn(), metadata |
 | 16 | [Config](./16-config.md) | Variables d'env, constantes, scripts, next.config |
 | 17 | [SEO](./17-seo-metadata.md) | getPageMetadata, SITE_CONFIG, PAGES_METADATA, sitemap, og |
 
@@ -161,7 +161,7 @@ src/api/generated/
 │   └── *.ts                 ← types TypeScript (AuthLoginBodyDTO, UserProfileDTO...)
 └── zod/
     └── {domain}/
-        └── {domain}.ts      ← schemas Zod (authControllerLoginBody, userControllerUpdateBody...)
+        └── {domain}.ts      ← schemas Zod (AuthControllerLoginBody, UserControllerUpdateBody...)
 ```
 
 Le nom du domaine correspond au tag `@ApiTags()` du controller côté API. Exemple : controller tagué `auth` → `useAuthControllerLogin` dans `src/api/generated/auth/auth.ts`.
@@ -304,42 +304,31 @@ Voir aussi : [Pages](./07-pages.md), [SEO](./17-seo-metadata.md)
 
 import { AlertCircleIcon } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, UseFormSetError } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
 // 1. Schema Zod généré par Orval (préféré) ou défini manuellement
-import { featureControllerActionBody } from '@/api/generated/zod/{domain}/{domain}';
+import { FeatureControllerActionBody } from '@/api/generated/zod/{domain}/{domain}';
 // 2. Hook React Query généré par Orval
 import { useFeatureControllerAction } from '@/api/generated/{domain}/{domain}';
-// 3. Types d'erreur générés par Orval
-import {
-  InternalServerErrorExceptionResponseDTO,
-  ValidationExceptionResponseDTO,
-} from '@/api/generated/schemas';
-// 4. Composants form
+// 3. Composants form
 import { Form } from '@/components/form/form';
 import { RhfTextInput, RhfPasswordInput } from '@/components/form/inputs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle } from '@/components/ui/alert';
-// 5. Contextes et hooks
-import { useAuth } from '@/contexts/AuthContext';
+// 4. Hooks
 import { useZodI18n } from '@/hooks/useZodI18n';
 import { useAppRouter } from '@/hooks/useAppRouter';
-import { parseAxiosError } from '@/utils/errors';
+import { handleServerErrors } from '@/utils/errors';
 import { APP_PATHS } from '@/constants/constants';
 
-const zSchema = featureControllerActionBody;
+const zSchema = FeatureControllerActionBody;
 type FormInputs = z.infer<typeof zSchema>;
 
-// Union des types d'erreur possibles pour cet endpoint : adapter selon les codes HTTP retournés
-type FeatureErrorResponse =
-  | ValidationExceptionResponseDTO
-  | InternalServerErrorExceptionResponseDTO;
-
 export default function FeatureForm() {
-  const { t } = useTranslation(['{namespace}', 'common']);
+  const { t } = useTranslation('{namespace}');
   const router = useAppRouter();
 
   const { mutate, isPending } = useFeatureControllerAction();
@@ -362,15 +351,7 @@ export default function FeatureForm() {
           router.push(APP_PATHS.HOME);
         },
         onError: (error) => {
-          const errData = parseAxiosError<FeatureErrorResponse>(
-            error,
-            t('common:error.500', { defaultValue: "Une erreur est survenue." })
-          );
-          if (errData.statusCode === 400) {
-            mapFieldsErrors(setError, errData);
-          } else {
-            setError('root', { type: 'server', message: errData.message });
-          }
+          handleServerErrors(error, setError);
         },
       }
     );
@@ -378,7 +359,7 @@ export default function FeatureForm() {
 
   return (
     <Form methods={methods} onSubmit={onSubmit}>
-      {/* Erreur globale : utiliser Alert pour une meilleure UX */}
+      {/* Erreur globale : affichée automatiquement par handleServerErrors sur errors.root */}
       {errors.root && (
         <Alert variant="destructive">
           <AlertCircleIcon />
@@ -400,53 +381,36 @@ export default function FeatureForm() {
     </Form>
   );
 }
-
-// Helper local : mapper les violations serveur sur les champs du formulaire
-function mapFieldsErrors(
-  setError: UseFormSetError<FormInputs>,
-  error: FeatureErrorResponse,
-) {
-  if ('violations' in error) {
-    error.violations.forEach((v) => {
-      setError(v.field as keyof FormInputs, { type: 'server', message: v.message });
-    });
-    return;
-  }
-}
 ```
 
 **Règles importantes :**
-- Toujours utiliser le schema Zod généré par Orval (`featureControllerActionBody`) : il est en sync avec les validations de l'API
+- Toujours utiliser le schema Zod généré par Orval (`FeatureControllerActionBody`) : il est en sync avec les validations de l'API
 - `useZodI18n(methods)` est **obligatoire** dans chaque formulaire avec Zod
 - Pour la prop `required` sur les inputs, la dériver du schéma Zod plutôt que de la coder en dur : `required={!zSchema.shape.field.safeParse('').success}`. Ce pattern est fiable pour les champs `string` ; pour les champs d'un autre type (boolean, number…), `safeParse('')` échoue systématiquement : utiliser la valeur vide du type concerné (ex: `safeParse(false)` pour un boolean).
 - Le message affiché en `onSuccess` vient d'une clé de traduction frontend, pas de `response.message`
-- Gestion du 401 dans `onError` : deux cas :
-  - **Route protégée (auth requise)** : ajouter `if (errData.statusCode === 401) return;` en premier dans `onError` : le 401 est géré silencieusement par `MutationCache` (refresh + retry automatique)
-  - **Route non protégée avec 401 métier** (ex : token de réinitialisation expiré) : traiter explicitement avec redirection ou toast d'erreur
+- Gestion du 401 dans `onError` : utiliser `handleServerErrors(error, setError)` — le 401 est silencieux par défaut car le `MutationCache` gère refresh + retry automatiquement. Pour les routes dans `ROUTES_WITHOUT_RETRY` (login, reset-password…), un 401 est une vraie erreur métier : passer `{ includeUnauthorizedAlert: true }`.
 - Utiliser `mutate` (avec callbacks) pour les formulaires, `mutateAsync` uniquement si un `await` est nécessaire
 - Utiliser `useAppRouter` à la place de `useRouter` (barre de progression)
 
 **Cas particulier : formulaire de connexion :**
 
-Un formulaire de login doit, après succès, mettre à jour la session :
-1. `localStorage.setItem(FLAG_SESSION.KEY, FLAG_SESSION.VALID)` : marquer la session comme valide
-2. `fetchAndSetUser()` : recharger les données utilisateur depuis l'API
+Après un login réussi, appeler `refetchMe()` pour recharger les données utilisateur depuis l'API :
 
 ```tsx
-import { FLAG_SESSION } from '@/constants/constants';
 import { useAuth } from '@/contexts/AuthContext';
 
-const { fetchAndSetUser } = useAuth();
+const { refetchMe } = useAuth();
 
 mutate(
   { data: input },
   {
     onSuccess: () => {
-      localStorage.setItem(FLAG_SESSION.KEY, FLAG_SESSION.VALID);
-      fetchAndSetUser();
-      // Puis router.push() si redirection nécessaire
+      refetchMe();
     },
-    // ...
+    onError: (error) => {
+      // LOGIN est dans ROUTES_WITHOUT_RETRY : 401 = mauvais identifiants
+      handleServerErrors(error, setError, { includeUnauthorizedAlert: true });
+    },
   }
 );
 ```
@@ -455,7 +419,8 @@ mutate(
 
 | Composant | Cas d'usage |
 |-----------|------------|
-| `RhfTextInput` | Texte, email (`type="email"`) |
+| `RhfTextInput` | Texte libre |
+| `RhfEmailInput` | Email (avec icône `@` intégrée) |
 | `RhfPasswordInput` | Mot de passe (toggle visibilité inclus) |
 | `RhfTextAreaInput` | Texte multi-lignes |
 | `RhfNumberInput` | Valeurs numériques |
@@ -494,7 +459,13 @@ Pour les appels API hors formulaire (ex: bouton d'action, chargement de données
 
 // Mutation (POST/PATCH/DELETE)
 import { useFeatureControllerAction } from '@/api/generated/{domain}/{domain}';
+// Query (GET)
+import { useFeatureControllerGetData } from '@/api/generated/{domain}/{domain}';
+import { useTranslation } from 'react-i18next';
+import { displayError } from '@/utils/errors';
+import { toast } from 'sonner';
 
+const { t } = useTranslation('{namespace}');
 const { mutate, isPending } = useFeatureControllerAction();
 
 const handleAction = () => {
@@ -503,15 +474,11 @@ const handleAction = () => {
     {
       onSuccess: () => { toast.success(t('{namespace}:form.success', { defaultValue: '...' })); },
       onError: (error) => {
-        const errData = parseAxiosError<ErrorType>(error, t('common:error.500', { defaultValue: 'Une erreur est survenue.' }));
-        toast.error(errData.message);
+        displayError(error); // silencieux sur 401 (QueryClient gère le refresh + retry)
       },
     }
   );
 };
-
-// Query (GET)
-import { useFeatureControllerGetData } from '@/api/generated/{domain}/{domain}';
 
 const { data, isLoading, isError } = useFeatureControllerGetData();
 ```
@@ -526,9 +493,9 @@ Dans n'importe quel composant client, l'utilisateur est disponible via `useAuth(
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function MyComponent() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoadingUser } = useAuth();
 
-  if (isLoading) return <PageLoader />;
+  if (isLoadingUser) return <PageLoader />;
   if (!user) return null;
 
   return <p>Bonjour {user.firstName}</p>;
@@ -541,13 +508,10 @@ export default function MyComponent() {
 
 | Valeur | Type | Usage |
 |--------|------|-------|
-| `user` | `UserProfileDTO \| undefined` | Données de l'utilisateur connecté |
-| `isLoading` | `boolean` | En cours de vérification du token |
-| `isFirstLoad` | `boolean` | Premier chargement de l'app (avant que l'auth soit connue) |
-| `disconnect` | `() => void` | Déconnecte l'utilisateur, vide le localStorage, redirige vers `/` |
-| `fetchAndSetUser` | `() => Promise<...>` | Recharge les données utilisateur depuis l'API et met à jour le contexte : à appeler après une mise à jour du profil |
-| `checkToken` | `(disconnectIfFailed: boolean) => Promise<void>` | Vérifie la validité du token (utilisé par les guards) |
-| `tryRefreshToken` | `(disconnectIfFailed: boolean) => Promise<...>` | Tente un refresh du token (utilisé en interne) |
+| `user` | `UserProfileDTO \| undefined` | Données de l'utilisateur connecté, `undefined` si non connecté |
+| `isLoadingUser` | `boolean` | Vrai pendant le premier chargement du profil |
+| `isRefreshingSession` | `boolean` | Vrai pendant un rafraîchissement de token en cours |
+| `refetchMe` | `() => Promise<...>` | Recharge les données utilisateur depuis l'API : à appeler après un login ou une mise à jour du profil |
 
 **`onSettled` : même comportement succès et erreur :**
 
@@ -556,7 +520,7 @@ Quand l'action doit produire le même effet qu'elle réussisse ou échoue (ex : 
 ```tsx
 mutate(undefined, {
   onSettled: () => {
-    disconnect(); // appelé dans tous les cas
+    queryClient.setQueryData(getUserControllerGetProfileQueryKey(), null);
   },
 });
 ```
@@ -566,7 +530,7 @@ mutate(undefined, {
 Pour valider des champs que Zod ne peut pas vérifier (ex : confirmation de mot de passe), construire les violations manuellement avec `makeValidationErrorResponse` puis passer à `mapFieldsErrors` :
 
 ```tsx
-import { makeValidationErrorResponse } from '@/utils/errors';
+import { makeValidationErrorResponse, mapFieldsErrors } from '@/utils/errors';
 
 const onSubmit = handleSubmit((input) => {
   const clientViolations = [];
@@ -825,18 +789,18 @@ Les titres des entrées de navigation sont traduits via `useTranslation('header'
 - [ ] `canonical` correct dans la metadata
 
 ### 4. Implémentation
-- [ ] Schema Zod Orval utilisé comme source de vérité (`featureControllerActionBody`)
+- [ ] Schema Zod Orval utilisé comme source de vérité (`FeatureControllerActionBody`)
 - [ ] `useZodI18n(methods)` présent dans chaque formulaire
 - [ ] `useAppRouter` utilisé à la place de `useRouter`
 - [ ] Inputs RHF utilisés (pas d'input HTML natif dans les formulaires)
 - [ ] `Button` avec `loading={isSubmitting || isPending}`
-- [ ] Erreurs de validation mappées sur les champs (`setError` par violation)
-- [ ] Erreur globale affichée via `Alert` si pas de violations (`errors.root`)
-- [ ] `parseAxiosError<TypeErreur>()` utilisé pour extraire les erreurs
-- [ ] `useAuth()` pour accéder à l'utilisateur connecté
+- [ ] `handleServerErrors(error, setError)` dans `onError` des formulaires
+- [ ] `displayError(error)` dans `onError` hors formulaire
+- [ ] Erreur globale affichée via `Alert` sur `errors.root`
+- [ ] `useAuth()` pour accéder à l'utilisateur connecté (`user`, `isLoadingUser`, `refetchMe`)
 - [ ] `toast.success / toast.error` (depuis `'sonner'`) pour les feedbacks utilisateur
 - [ ] `cn()` pour les classes CSS conditionnelles
-- [ ] Formulaire de connexion : `FLAG_SESSION` + `fetchAndSetUser` dans `onSuccess`
+- [ ] Formulaire de connexion : `refetchMe()` dans `onSuccess` + `includeUnauthorizedAlert: true` dans `onError`
 
 ### 5. Traductions
 - [ ] Namespace créé ou existant identifié

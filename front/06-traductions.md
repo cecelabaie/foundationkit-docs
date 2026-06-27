@@ -12,7 +12,7 @@ Le système de traduction repose sur plusieurs packages :
 - **i18next-chained-backend** - Permet d'utiliser plusieurs backends en cascade
 - **i18next-http-backend** - Chargement des traductions via HTTP
 - **i18next-localstorage-backend** - Stockage des traductions dans le localStorage
-- `**utils/i18n.zod.ts`** - Implémentation locale de la carte d'erreurs Zod (fork adapté de `zod-i18n-map` pour compatibilité Zod v4, récupéré depuis GitHub)
+- **`utils/i18n.zod.ts`** - Implémentation locale de la carte d'erreurs Zod (fork adapté de `zod-i18n-map` pour compatibilité Zod v4, récupéré depuis GitHub)
 
 ## Configuration
 

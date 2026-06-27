@@ -8,6 +8,8 @@ L'application utilise plusieurs hooks personnalisés :
 1. **useAppRouter** - Navigation avec barre de progression
 2. **useIsScreenBelowBreakpoint** - Détection de breakpoints pour rendu conditionnel
 3. **useZodI18n** - Mise à jour des messages d'erreur lors du changement de langue
+4. **useFileOpen** - Ouverture d'un fichier protégé dans un nouvel onglet
+5. **useFileDownload** - Téléchargement d'un fichier protégé avec nom personnalisé
 
 ## useAppRouter
 
@@ -105,3 +107,57 @@ function MyForm() {
 ```
 
 Pour plus d'informations sur le système de traduction et son intégration avec Zod, consultez [traductions.md](./06-traductions.md).
+
+## useFileOpen
+
+**Fichier :** `src/hooks/useFileFetch.ts`
+
+Récupère un fichier protégé via l'API (avec les cookies de session) et l'ouvre dans un nouvel onglet. Utilise `AXIOS_INSTANCE`, ce qui signifie que la gestion du refresh token s'applique : si la requête retourne 401, le `QueryClient` tente automatiquement de rafraîchir la session puis rejoue la requête. `isLoading` reste vrai pendant tout ce temps.
+
+### Utilisation
+
+```tsx
+import { useFileOpen } from '@/hooks/useFileFetch';
+
+function MyComponent() {
+  const { open, isLoading } = useFileOpen();
+
+  return (
+    <button onClick={() => open('/files/document.pdf')} disabled={isLoading}>
+      Ouvrir le document
+    </button>
+  );
+}
+```
+
+| Retour | Type | Description |
+|--------|------|-------------|
+| `open` | `(url: string) => void` | Déclenche le chargement et l'ouverture du fichier |
+| `isLoading` | `boolean` | Vrai pendant le chargement (y compris pendant un refresh de session) |
+
+## useFileDownload
+
+**Fichier :** `src/hooks/useFileFetch.ts`
+
+Récupère un fichier protégé via l'API et déclenche son téléchargement avec un nom de fichier personnalisé. Comme `useFileOpen`, bénéficie du refresh token automatique via `AXIOS_INSTANCE`.
+
+### Utilisation
+
+```tsx
+import { useFileDownload } from '@/hooks/useFileFetch';
+
+function MyComponent() {
+  const { download, isLoading } = useFileDownload();
+
+  return (
+    <button onClick={() => download('/files/report.pdf', 'rapport-2024.pdf')} disabled={isLoading}>
+      Télécharger le rapport
+    </button>
+  );
+}
+```
+
+| Retour | Type | Description |
+|--------|------|-------------|
+| `download` | `(url: string, name: string) => void` | Déclenche le chargement et le téléchargement du fichier |
+| `isLoading` | `boolean` | Vrai pendant le chargement (y compris pendant un refresh de session) |

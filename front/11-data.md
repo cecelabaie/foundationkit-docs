@@ -11,16 +11,14 @@ Les hooks d'API sont générés automatiquement par Orval à partir des définit
 ```tsx
 // Import du hook généré pour la connexion
 import { useAuthControllerLogin } from '@/api/generated/auth/auth';
-import { AuthLoginBodyDTO, AuthLoginResponseDTO } from '@/api/generated/schemas';
-import { parseAxiosError } from '@/utils/errors';
+import { AuthLoginBodyDTO } from '@/api/generated/schemas';
+import { displayError } from '@/utils/errors';
 
 function LoginComponent() {
   // Récupération du hook de mutation avec son état
   const {
     mutate: login,
     isPending,
-    isError,
-    error
   } = useAuthControllerLogin();
 
   const handleLogin = (credentials: AuthLoginBodyDTO) => {
@@ -33,9 +31,7 @@ function LoginComponent() {
           console.log('Connexion réussie', response);
         },
         onError: (error) => {
-          // Gestion des erreurs avec parseAxiosError
-          const errData = parseAxiosError<UnauthorizedResponseDTO>(error, 'Erreur de connexion');
-          console.error('Erreur de connexion', errData);
+          displayError(error);
         }
       }
     );
@@ -89,42 +85,62 @@ Pour plus de détails sur la gestion des erreurs et les autres utilitaires dispo
 
 **Fichier :** `src/config/queryClient.ts`
 
-Le `QueryClient` gère automatiquement le rafraîchissement de session et le retry. Il est configuré avec trois niveaux :
+Le `QueryClient` gère automatiquement le rafraîchissement de session et le retry.
 
-#### QueryCache : erreurs sur les `useQuery`
+#### Gestion des 401 : `handleAuthError`
 
-Sur toute erreur 401 :
+Une fonction `handleAuthError` est partagée entre le `QueryCache` et le `MutationCache`. Sur toute erreur 401 :
+
 1. Si la route est dans `ROUTES_WITHOUT_RETRY` → abandon immédiat (évite une boucle infinie sur `/auth/refresh-session` lui-même)
-2. Sinon → appel `POST /auth/refresh-session`
-   - Succès (201) : refetch automatique de la query concernée
-   - Échec : redirection vers `/` (déconnexion implicite)
+2. Sinon → appel `refreshToken()`
+   - Succès : ré-exécution automatique de l'opération en échec (refetch query ou re-execute mutation)
+   - Échec : appel du callback `onAuthFailed`, qui efface l'utilisateur en cache (enregistré depuis `AuthContext`)
 
-#### MutationCache : erreurs sur les `useMutation`
+Le refresh est **dédupliqué** via une `refreshPromise` singleton : si plusieurs requêtes échouent en 401 simultanément, un seul appel `POST /auth/refresh-session` est effectué. Toutes les opérations en attente reprennent ensuite.
 
-Même logique que le QueryCache, mais au lieu d'un refetch, la mutation est **ré-exécutée** avec les mêmes variables (`mutation.execute(variables)`).
+Les callbacks sont enregistrés depuis `AuthContext` au montage :
+
+```tsx
+registerAuthFailedCallback(() => {
+  queryClient.setQueryData(getUserControllerGetProfileQueryKey(), null);
+});
+
+registerRefreshCallbacks(
+  () => setIsRefreshingSession(true),
+  () => setIsRefreshingSession(false)
+);
+```
 
 #### defaultOptions : politique de retry
+
+La politique de retry utilise une **allowlist** : seules les erreurs transitoires sont retentées. Les erreurs déterministes (4xx) ne sont jamais retentées car une deuxième tentative donnerait le même résultat.
+
+```tsx
+const RETRYABLE_STATUS = new Set([408, 500, 502, 503, 504]);
+
+const shouldRetry = (failureCount: number, error: unknown): boolean => {
+  if (failureCount >= 1) return false;
+  const status = getErrorStatus(error);
+  return status === undefined || RETRYABLE_STATUS.has(status);
+};
+```
 
 | | Queries | Mutations |
 |---|---|---|
 | Max tentatives | 1 | 1 |
-| Skip si 401 | oui | oui |
-| Skip si 429 | oui | oui |
-| Skip si 400 | non | **oui** |
-| Skip si route sans retry | oui | oui |
+| Retry si 4xx (400, 401, 429...) | non | non |
+| Retry si 5xx / 408 | oui | oui |
+| Retry si statut inconnu | oui | oui |
 
-Les mutations ne retentent jamais sur une 400 (erreur de validation) car une deuxième tentative donnerait le même résultat.
-
-Les routes exclues du retry sont définies dans `src/constants/constants.ts` :
+Les routes exclues de la logique 401 sont définies dans `src/constants/constants.ts` :
 
 ```tsx
 export const ROUTES_WITHOUT_RETRY = [
-  API_PATHS.AUTH.VALIDATE_SESSION,
   API_PATHS.AUTH.REFRESH_SESSION,
   API_PATHS.AUTH.LOGIN,
-  API_PATHS.AUTH.LOGOUT,
-  API_PATHS.USER.REGISTER,
-  // ...
+  API_PATHS.RESET_PASSWORD.VALIDATE,
+  API_PATHS.RESET_PASSWORD.UPDATE,
+  API_PATHS.USER.VERIFY_ACCOUNT,
 ];
 ```
 

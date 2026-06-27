@@ -14,21 +14,22 @@ Le projet fournit des composants réutilisables pour les formulaires dans le dos
 
 #### Liste des composants disponibles
 
-1. `RhfTextInput` - Champs texte, email
-2. `RhfPasswordInput` - Mot de passe avec toggle visibilité
-3. `RhfTextAreaInput` - Zone de texte multi-lignes
-4. `RhfNumberInput` - Nombres
-5. `RhfSelectInput` - Select avec options
-6. `RhfComboboxInput` - Select avec recherche
-7. `RhfRadioInput` - Boutons radio
-8. `RhfCheckboxInput` - Case à cocher
-9. `RhfSwitchInput` - Switch toggle
-10. `RhfDateInput` - Date avec calendrier
-11. `RhfCalendarInput` - Calendrier complet
-12. `RhfFileInput` - Upload de fichier
-13. `RhfInputColorPicker` - Sélecteur de couleur
-14. `RhfMultiSelectInput` - Sélection multiple avec recherche
-15. `RhfDynamicSelectInput` - Select avec création à la volée via modale
+1. `RhfTextInput` - Champs texte
+2. `RhfEmailInput` - Email (avec icône `@` intégrée)
+3. `RhfPasswordInput` - Mot de passe avec toggle visibilité
+4. `RhfTextAreaInput` - Zone de texte multi-lignes
+5. `RhfNumberInput` - Nombres
+6. `RhfSelectInput` - Select avec options
+7. `RhfComboboxInput` - Select avec recherche
+8. `RhfRadioInput` - Boutons radio
+9. `RhfCheckboxInput` - Case à cocher
+10. `RhfSwitchInput` - Switch toggle
+11. `RhfDateInput` - Date avec calendrier
+12. `RhfCalendarInput` - Calendrier complet
+13. `RhfFileInput` - Upload de fichier
+14. `RhfInputColorPicker` - Sélecteur de couleur
+15. `RhfMultiSelectInput` - Sélection multiple avec recherche
+16. `RhfDynamicSelectInput` - Select avec création à la volée via modale
 
 ## Utilisation
 
@@ -41,8 +42,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form } from '@/components/form/form';
 import { Button } from '@/components/ui/button';
-import { RhfTextInput, RhfPasswordInput } from '@/components/form/inputs';
+import { RhfEmailInput, RhfPasswordInput } from '@/components/form/inputs';
 import { useZodI18n } from '@/hooks/useZodI18n';
+import { handleServerErrors } from '@/utils/errors';
+import { useFeatureControllerAction } from '@/api/generated/{domain}/{domain}';
 
 // Définir un schéma de validation avec Zod
 const loginSchema = z.object({
@@ -51,8 +54,8 @@ const loginSchema = z.object({
 });
 
 // Ou utiliser un schéma généré par Orval
-// import { authControllerLoginBody } from '@/api/generated/zod/auth/auth';
-// const loginSchema = authControllerLoginBody;
+// import { AuthControllerLoginBody } from '@/api/generated/zod/auth/auth';
+// const loginSchema = AuthControllerLoginBody;
 
 // Type inféré du schéma
 type LoginFormInputs = z.infer<typeof loginSchema>;
@@ -73,27 +76,37 @@ function LoginForm() {
   useZodI18n(methods);
   
   // Destructurer les méthodes et états utiles
-  const { 
-    handleSubmit, 
-    formState: { isSubmitting }
+  const {
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting }
   } = methods;
   
-  const onSubmit = (data: LoginFormInputs) => {
-    mutate({ data });
-  };
-  
+  const onSubmit = handleSubmit((data) => {
+    mutate(
+      { data },
+      {
+        onSuccess: () => {
+          // Traitement succès...
+        },
+        onError: (error) => {
+          handleServerErrors(error, setError);
+        },
+      }
+    );
+  });
+
   return (
-    <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
-      <RhfTextInput
+    <Form methods={methods} onSubmit={onSubmit}>
+      <RhfEmailInput
         control={methods.control}
         name="email"
-        type="email"
         label="Email"
         placeholder="Votre email"
         autoComplete="email"
         required={!loginSchema.shape.email.safeParse('').success}
       />
-      
+
       <RhfPasswordInput
         control={methods.control}
         name="password"
@@ -102,7 +115,7 @@ function LoginForm() {
         autoComplete="current-password"
         required={!loginSchema.shape.password.safeParse('').success}
       />
-      
+
       <Button
         type="submit"
         loading={isSubmitting || isPending}
@@ -136,39 +149,49 @@ Le hook `useZodI18n` permet de forcer la re-validation du formulaire lorsque la 
 
 ### Alerte d'erreur globale
 
-Pour afficher une erreur globale (non liée à un champ spécifique), utilisez le pattern suivant :
+`handleServerErrors` place automatiquement les erreurs non-champ sur `errors.root`. Il suffit d'afficher ce champ dans le JSX :
 
 ```tsx
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import { AlertCircleIcon } from 'lucide-react';
 
-// Dans votre composant
-const {
-  handleSubmit,
-  setError,
-  formState: { errors }
-} = methods;
-
-// Dans votre gestionnaire d'erreur
-setError('root', {
-  type: 'server',
-  message: "Message d'erreur global"
-});
-
-// Dans votre JSX
 {errors.root && (
   <Alert variant="destructive">
     <AlertCircleIcon />
-    <AlertTitle>
-      {errors.root.message}
-    </AlertTitle>
+    <AlertTitle>{errors.root.message}</AlertTitle>
   </Alert>
 )}
 ```
 
-## Forcer des erreurs de validations
+## Gestion des erreurs serveur
 
-### makeValidationErrorResponse
+### Pattern standard : handleServerErrors
 
-La fonction `makeValidationErrorResponse` permet de créer manuellement des erreurs de validation côté client pour les champs, notamment pour traiter les réponses d'API qui ne correspondent pas au format attendu par les formulaires.
-Pour plus d'informations consultez [utils.md](./15-utils.md).
+`handleServerErrors` est la fonction à utiliser dans `onError` pour tous les formulaires. Elle dispatche automatiquement selon le code HTTP :
+
+- **400** : erreurs de champ (affichées sous chaque input via `mapFieldsErrors`)
+- **401** : silencieux par défaut car le QueryClient intercepte le 401, tente le refresh et rejoue la mutation automatiquement. L'utilisateur ne doit pas voir d'erreur dans ce cas.
+- **Autres** : erreur sur `root` (affichée dans l'`Alert` du formulaire)
+
+```tsx
+import { handleServerErrors } from '@/utils/errors';
+
+onError: (error) => {
+  handleServerErrors(error, setError);
+}
+```
+
+**Exception : routes dans `ROUTES_WITHOUT_RETRY`**
+
+Pour les routes exclues du retry (ex: `/auth/login`), le QueryClient ne tente pas de refresh sur un 401 car un 401 sur ces routes signifie une vraie erreur métier (mauvais identifiants, token invalide...) et non une session expirée. Dans ce cas, il faut afficher l'erreur 401 explicitement :
+
+```tsx
+onError: (error) => {
+  handleServerErrors(error, setError, {
+    includeUnauthorizedAlert: true,
+    onUnauthorized: () => router.push(APP_PATHS.LOGIN), // optionnel : action à exécuter sur 401
+  });
+}
+```
+
+Pour plus de détails sur `handleServerErrors`, `displayError` et `mapFieldsErrors`, consultez [utils.md](./15-utils.md).

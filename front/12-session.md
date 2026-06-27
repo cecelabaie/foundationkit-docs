@@ -15,7 +15,6 @@ Côté front-end, la session est orchestrée par plusieurs mécanismes compléme
 1. **AuthContext** - Contexte React central qui gère l'état de l'utilisateur et les opérations d'authentification
 2. **Guards** - Composants de protection des routes selon l'état d'authentification
 3. **QueryClient** - Configuration React Query qui gère le rafraîchissement automatique du token
-4. **Flag de session** - Indicateur simple dans le localStorage qui signale l'état potentiel de connexion
 
 Pour plus de détails sur l'implémentation backend de la session, consultez [api/07-session.md](../api/07-session.md).
 
@@ -24,50 +23,56 @@ Pour plus de détails sur l'implémentation backend de la session, consultez [ap
 Le `AuthContext` est le cœur du système d'authentification. Il fournit :
 
 - L'état de l'utilisateur courant (`user`)
-- Les méthodes d'authentification et de vérification
 - Les états de chargement
 
-### Méthodes principales
+### Valeurs exposées
 
-| Méthode | Description |
-|---------|-------------|
-| `checkToken` | Vérifie la validité du token actuel via l'API et, en cas d'échec, appelle `tryRefreshToken` |
-| `fetchAndSetUser` | Récupère les données de l'utilisateur depuis l'API et met à jour le contexte |
-| `tryRefreshToken` | Tente de rafraîchir la session en utilisant le refresh token stocké dans les cookies |
-| `disconnect` | Déconnecte l'utilisateur, supprime le flag de session et redirige vers la page d'accueil |
+| Valeur | Type | Description |
+|--------|------|-------------|
+| `user` | `UserProfileDTO \| undefined` | Données de l'utilisateur connecté, `undefined` si non connecté |
+| `isLoadingUser` | `boolean` | Vrai pendant le premier chargement du profil |
+| `isRefreshingSession` | `boolean` | Vrai pendant un rafraîchissement de token en cours |
+| `refetchMe` | `function` | Force un rechargement du profil utilisateur depuis l'API |
 
 ### Cycle de vie de la session
 
-1. **Initialisation** : Au chargement de l'application, `AuthContext` vérifie si un flag de session existe dans le localStorage
-2. **Vérification** : Si le flag existe, appel à l'API `/auth/validate-session` pour vérifier la validité du token
-3. **Rafraîchissement** : Si le token est invalide mais qu'un refresh token existe, tentative de rafraîchissement
-4. **Chargement des données** : Si l'authentification réussit, récupération des données utilisateur
+Au montage, `AuthContext` effectue un unique appel `GET /user/profile` via React Query pour déterminer si l'utilisateur est connecté. Aucune logique de flag localStorage ou de validate-session n'est nécessaire : la requête profil sert directement de vérification d'authentification.
 
-### Flag de session
+- Si la requête réussit → `user` est alimenté, l'application s'affiche
+- Si la requête retourne 401 → le `QueryClient` tente un refresh automatique (voir [data.md](./11-data.md))
+  - Refresh réussi → la requête profil est relancée
+  - Refresh échoué → `onAuthFailed` est appelé, ce qui place `null` en cache, `user` devient `undefined`
 
-Le système utilise un simple drapeau dans le localStorage pour indiquer l'état potentiel de connexion :
+La query profil est configurée avec `retry: false` et `staleTime: Infinity` pour éviter tout appel parasite après un `setQueryData(null)`.
 
-```typescript
-export const FLAG_SESSION = {
-  KEY: 'flag_session',
-  VALID: 'up',
-};
+### Enregistrement des callbacks QueryClient
+
+`AuthContext` enregistre deux séries de callbacks dans le `QueryClient` au montage :
+
+```tsx
+registerAuthFailedCallback(() => {
+  queryClient.setQueryData(getUserControllerGetProfileQueryKey(), null);
+});
+
+registerRefreshCallbacks(
+  () => setIsRefreshingSession(true),
+  () => setIsRefreshingSession(false)
+);
 ```
 
-Ce flag sert uniquement lors du rafraîchissement de la page pour déterminer si une tentative de validation de session doit être effectuée. Avec ce flag, l'application évite un appel API inutile pour les visiteurs non connectés. **Important** : ce flag n'est pas une preuve d'authentification, mais simplement un indicateur d'état potentiel qui optimise les performances.
+Ces callbacks permettent au `QueryClient` de notifier l'`AuthContext` sans dépendance circulaire.
 
 ## Guards de protection
 
-L'application utilise trois guards pour protéger les différentes parties de l'application :
+L'application utilise quatre guards pour protéger les différentes parties de l'application :
 
 ### AuthGuard
 
 Protège les routes nécessitant une authentification (`src/app/(logged)/...`).
 
 - Vérifie que l'utilisateur est connecté
-- Redirige vers la page de login si non connecté
+- Redirige vers la page de login si non connecté (avec `?returnTo=` pour revenir après connexion)
 - Supporte la vérification des rôles (`requiredRoles`)
-- Conserve l'URL originale dans le paramètre `returnTo` pour rediriger après connexion
 
 ```tsx
 <AuthGuard requiredRoles={['user']}>
@@ -79,7 +84,7 @@ Protège les routes nécessitant une authentification (`src/app/(logged)/...`).
 
 Protège les routes accessibles uniquement aux utilisateurs non connectés (`src/app/(unlogged)/...`).
 
-- Redirige vers la page d'accueil si l'utilisateur est déjà connecté
+- Redirige vers la page `returnTo` ou `/` si l'utilisateur est déjà connecté
 
 ```tsx
 <UnloggedGuard>
@@ -89,11 +94,11 @@ Protège les routes accessibles uniquement aux utilisateurs non connectés (`src
 
 ### ForgotPasswordGuard
 
-Protège spécifiquement la route de réinitialisation de mot de passe (`/forgot-password/new-password`).
+Protège la route de réinitialisation de mot de passe (`/forgot-password/new-password`).
 
-- Vérifie la validité du token dans l'URL
-- Redirige vers la page de demande de réinitialisation si le token est invalide
-- Affiche des messages d'erreur appropriés selon le type d'erreur
+- Vérifie la validité du token dans l'URL via `POST /reset-password/validate`
+- Redirige vers `/forgot-password` si le token est invalide
+- Affiche les erreurs via `displayError`
 
 ```tsx
 <ForgotPasswordGuard>
@@ -101,20 +106,24 @@ Protège spécifiquement la route de réinitialisation de mot de passe (`/forgot
 </ForgotPasswordGuard>
 ```
 
-### Protection des vues
+### VerifyAccountGuard
 
-Grâce au système de guards, le contenu protégé n'est jamais visible tant que la vérification d'authentification n'a pas réussi. Pendant la vérification, un composant de chargement (`PageLoader`) est affiché à la place du contenu.
+Protège la route de vérification de compte (`/verify-account`).
+
+- Lit `userId` et `token` dans les query params
+- Appelle `POST /user/verify-account` au montage
+- Redirige systématiquement vers `/login` une fois la vérification terminée (succès ou erreur)
+- N'affiche jamais de contenu enfant : retourne toujours un `PageLoader`
 
 ```tsx
-// Extrait de AuthGuard
-if (isLoading || !user || !hasAccess) {
-  return <PageLoader />;
-}
-
-return children;
+<VerifyAccountGuard />
 ```
 
-> **Important** : Cette protection est implémentée au niveau du client (JavaScript). Bien que les guards empêchent l'affichage des composants protégés dans l'interface utilisateur, le code source des pages reste accessible dans le build et peut être inspecté dans les outils de développement du navigateur. Toutes données sensibles doivent venir de l'API et ne doivent pas être côté client.
+### Protection des vues
+
+Pendant la vérification d'authentification, un composant `PageLoader` est affiché. Le contenu protégé n'est jamais rendu tant que la vérification n'a pas réussi.
+
+> **Important** : Cette protection est implémentée au niveau du client (JavaScript). Le code source des pages reste accessible dans le build. Toutes données sensibles doivent venir de l'API et ne doivent pas être stockées côté client.
 
 ## Intégration avec React Query
 

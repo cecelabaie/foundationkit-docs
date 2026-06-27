@@ -20,6 +20,9 @@ L'application utilise un système de layouts imbriqués basé sur l'App Router d
 4. **Layout reset password** (`src/app/(unlogged)/(reset-password)/forgot-password/new-password/layout.tsx`)
    - Utilise `ForgotPasswordGuard` pour vérifier la validité du token
 
+5. **Layout verify account** (`src/app/(unlogged)/(verify-account)/layout.tsx`)
+   - Utilise `VerifyAccountGuard` pour vérifier le compte après inscription
+
 ## Layout racine
 
 ```tsx

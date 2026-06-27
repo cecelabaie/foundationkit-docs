@@ -116,7 +116,7 @@ Les schémas Zod sont générés à partir du fichier OpenAPI (Swagger) de l'API
 1. NestJS génère automatiquement une documentation OpenAPI (Swagger) à partir des DTOS et des décorateurs
 
 2. Orval lit cette documentation OpenAPI et convertit ces contraintes en validations Zod équivalentes
-   - format: email → `zod.string().email()`
+   - format: email → `zod.email()`
    - minLength: 1 → `zod.string().min(1)`
 
 #### Schémas générés
@@ -125,8 +125,8 @@ Pour chaque endpoint de l'API, Orval génère des schémas Zod correspondants da
 
 ```typescript
 // src/api/generated/zod/auth/auth.ts
-export const authControllerLoginBody = zod.object({
-  email: zod.string().email(),  // Contrainte email du Swagger
+export const AuthControllerLoginBody = zod.object({
+  email: zod.email(),           // Contrainte email du Swagger
   password: zod.string().min(1), // Contrainte minLength du Swagger
 });
 ```
@@ -175,30 +175,25 @@ Voici comment les éléments générés sont utilisés dans un composant réel :
 ```typescript
 // src/sections/login/login-form.tsx
 import { useAuthControllerLogin } from '@/api/generated/auth/auth';
-import {
-  InternalServerErrorExceptionResponseDTO,
-  TooManyRequestResponseDTO,
-  UnauthorizedResponseDTO,
-  ValidationExceptionResponseDTO,
-} from '@/api/generated/schemas';
-import { authControllerLoginBody } from '@/api/generated/zod/auth/auth';
+import { AuthControllerLoginBody } from '@/api/generated/zod/auth/auth';
 import { Form } from '@/components/form/form';
-import { RhfTextInput } from '@/components/form/inputs';
-import { parseAxiosError } from '@/utils/errors';
+import { RhfEmailInput, RhfPasswordInput } from '@/components/form/inputs';
+import { useZodI18n } from '@/hooks/useZodI18n';
+import { handleServerErrors } from '@/utils/errors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 export default function LoginForm() {
   // Hook React Query généré automatiquement par Orval
-  const { mutate: mutate_login } = useAuthControllerLogin();
-  
+  const { mutate: mutateLogin } = useAuthControllerLogin();
+
   // Schéma Zod généré automatiquement par Orval à partir des décorateurs du backend
-  const zloginSchema = authControllerLoginBody;
-  
+  const zloginSchema = AuthControllerLoginBody;
+
   // Type inféré du schéma Zod
   type LoginFormInputs = z.infer<typeof zloginSchema>;
-  
+
   // Configuration React Hook Form avec Zod
   const methods = useForm<LoginFormInputs>({
     resolver: zodResolver(zloginSchema),
@@ -207,31 +202,29 @@ export default function LoginForm() {
       password: '',
     },
   });
-  
+
+  // Obligatoire : re-valide les erreurs Zod au changement de langue
+  useZodI18n(methods);
+
   const { handleSubmit, setError } = methods;
-  
+
   // Soumission du formulaire avec handleSubmit
   const onSubmit = handleSubmit((input) => {
     // Utilisation du hook généré pour appeler l'API avec mutate
-    mutate_login(
+    mutateLogin(
       { data: input },
       {
         onSuccess: () => {
           // Traitement en cas de succès...
         },
         onError: (error) => {
-          // Gestion des erreurs typées avec l'utilitaire parseAxiosError
-          const errData = parseAxiosError<LoginErrorResponse>(error, 'Erreur');
-          // Traitement des erreurs selon le statusCode...
-          if (errData.statusCode === 400) {
-            // Mapper les erreurs de validation aux champs
-          }
-          // ...
+          // LOGIN est dans ROUTES_WITHOUT_RETRY : 401 = mauvais identifiants
+          handleServerErrors(error, setError, { includeUnauthorizedAlert: true });
         },
       }
     );
   });
-  
+
   return (
     <Form methods={methods} onSubmit={onSubmit}>
       {/* Champs du formulaire... */}

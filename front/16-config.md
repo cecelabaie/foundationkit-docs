@@ -177,26 +177,20 @@ Le fichier `src/constants/constants.ts` centralise les constantes importantes de
 
 ### API_PATHS
 
-Définit les chemins d'API pour les différentes fonctionnalités :
+Définit les chemins d'API utilisés directement par le frontend (hors hooks Orval). Seules les routes consommées manuellement (QueryClient, guards) sont listées ici.
 
 ```typescript
 export const API_PATHS = {
   AUTH: {
-    VALIDATE_SESSION: '/auth/validate-session',
     REFRESH_SESSION: '/auth/refresh-session',
     LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
-  },
-  USER: {
-    REGISTER: '/user/register',
-    UPDATE: '/user/update',
-    UPDATE_PASSWORD: '/user/update-password',
-    VERIFY_ACCOUNT: '/user/verify-account',
   },
   RESET_PASSWORD: {
-    FORGOT: '/reset-password/forgot',
     VALIDATE: '/reset-password/validate',
     UPDATE: '/reset-password/update',
+  },
+  USER: {
+    VERIFY_ACCOUNT: '/user/verify-account',
   },
 };
 ```
@@ -226,6 +220,11 @@ export const APP_PATHS = {
   // Routes publiques
   CONTACT: '/contact',
   NOT_FOUND: '/not-found',
+  TERMS_OF_SERVICE: '/terms-of-service',
+  TERMS_OF_USE: '/terms-of-use',
+  LEGAL_MENTIONS: '/legal-mentions',
+  PRIVACY_POLICY: '/privacy-policy',
+  COOKIES: '/cookies',
 };
 ```
 
@@ -237,15 +236,11 @@ Pour plus de détails sur le système de retry et la gestion des erreurs 401, co
 
 ```typescript
 export const ROUTES_WITHOUT_RETRY = [
-  API_PATHS.AUTH.VALIDATE_SESSION,
   API_PATHS.AUTH.REFRESH_SESSION,
   API_PATHS.AUTH.LOGIN,
-  API_PATHS.AUTH.LOGOUT,
-  API_PATHS.USER.REGISTER,
-  API_PATHS.USER.VERIFY_ACCOUNT,
-  API_PATHS.RESET_PASSWORD.FORGOT,
   API_PATHS.RESET_PASSWORD.VALIDATE,
   API_PATHS.RESET_PASSWORD.UPDATE,
+  API_PATHS.USER.VERIFY_ACCOUNT,
 ];
 ```
 

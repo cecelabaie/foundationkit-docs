@@ -64,7 +64,7 @@ Crée une réponse d'erreur de validation au format attendu par l'API. Cette fon
 - Gérer les cas où l'API renvoie une erreur générique (401, 500) mais qu'on souhaite l'afficher sur des champs spécifiques
 
 ```tsx
-import { makeValidationErrorResponse } from '@/utils/errors';
+import { makeValidationErrorResponse, mapFieldsErrors } from '@/utils/errors';
 
 // Création d'une erreur de validation pour des champs de formulaire
 const validationError = makeValidationErrorResponse(
@@ -83,62 +83,92 @@ const validationError = makeValidationErrorResponse(
   ]
 );
 
-// Utilisation avec React Hook Form
-if ('violations' in validationError) {
-  validationError.violations.forEach((violation) => {
-    setError(violation.field as keyof FormInputs, {
-      type: 'server',
-      message: violation.message
-    });
-  });
-}
+// Utilisation avec React Hook Form via mapFieldsErrors
+mapFieldsErrors(setError, validationError);
 ```
 
 ### parseAxiosError
 
-Parse une erreur Axios et la convertit en type d'erreur spécifique pour un traitement typé. Cette fonction :
-- Extrait les données de l'erreur Axios de manière typée
-- Fournit une structure d'erreur cohérente même si la réponse est incomplète
-- Permet de traiter différents types d'erreurs API (validation, authentification, serveur) de manière unifiée
+Parse une erreur Axios et la convertit en type d'erreur spécifique pour un traitement typé. Fournit une structure d'erreur cohérente même si la réponse est incomplète.
 
-**Important** : Vous devez spécifier en paramètre de type générique les types d'erreurs attendus générés par Orval. Ces types sont disponibles dans le dossier `@/api/generated/schemas`.
+**Note** : Dans la plupart des cas, utilisez `handleServerErrors` (formulaires) ou `displayError` (hors formulaire) plutôt que `parseAxiosError` directement. Ces fonctions l'utilisent en interne.
 
 ```tsx
 import { parseAxiosError } from '@/utils/errors';
-import { 
-  // Types d'erreurs générés par Orval
-  ValidationExceptionResponseDTO,
-  UnauthorizedResponseDTO,
-  TooManyRequestResponseDTO,
-  InternalServerErrorExceptionResponseDTO
-} from '@/api/generated/schemas';
 
-// Utilisation avec mutate (utilisé dans ce projet pour les formulaires)
-mutate_login(
+onError: (error) => {
+  const errData = parseAxiosError<ValidationExceptionResponseDTO | UnauthorizedResponseDTO>(
+    error,
+    'Erreur lors de la requête'
+  );
+  // errData.statusCode, errData.message, errData.violations...
+}
+```
+
+### handleServerErrors
+
+Fonction centrale pour la gestion des erreurs dans les formulaires React Hook Form. Dispatche automatiquement les erreurs selon leur type :
+
+- **400** → erreurs de champ via `mapFieldsErrors` (affichage sous chaque input)
+- **401** → `root` error uniquement si `includeUnauthorizedAlert: true` + callback `onUnauthorized` optionnel (sinon silencieux car le `QueryClient` gère le refresh)
+- **Autres** → `root` error (affiché dans l'`Alert` du formulaire)
+
+```tsx
+import { handleServerErrors } from '@/utils/errors';
+
+const { setError } = useForm();
+const { mutate } = useSomeControllerMutation();
+
+mutate(
   { data },
   {
-    onSuccess: (response) => {
-      // Traitement du succès...
-    },
+    onSuccess: () => { /* ... */ },
     onError: (error) => {
-      const errData = parseAxiosError<LoginErrorResponse>(error, 'Erreur');
-      // Traitement des erreurs...
-    }
+      handleServerErrors(error, setError);
+    },
   }
 );
 ```
 
-**Note** : Dans ce projet, les formulaires utilisent `mutate` avec les callbacks `onSuccess`/`onError`. Pour les cas où vous avez besoin d'attendre le résultat (ex: dans un contexte, un guard, etc.), on utilise `mutateAsync` :
+Avec options :
 
 ```tsx
-// Utilisation avec mutateAsync (pour les cas non-formulaires)
-try {
-  const response = await mutateAsync_login({ data });
-  // Traitement du succès...
-} catch (error) {
-  const errData = parseAxiosError<LoginErrorResponse>(error, 'Erreur');
-  // Traitement des erreurs...
+// Cas où on veut afficher l'erreur 401 (ex: formulaire de vérification de compte)
+handleServerErrors(error, setError, {
+  includeUnauthorizedAlert: true,
+  onUnauthorized: () => router.push(APP_PATHS.LOGIN),
+});
+```
+
+### displayError
+
+Affiche une erreur dans un toast Sonner. Ignore les 401 par défaut car le `QueryClient` se charge du refresh et du retry automatiquement. A utiliser hors formulaire (guards, callbacks sans formulaire).
+
+```tsx
+import { displayError } from '@/utils/errors';
+
+onError: (error) => {
+  displayError(error);
 }
+
+// Pour les routes dans ROUTES_WITHOUT_RETRY (ex: verifyAccountGuard)
+// où le QueryClient ne gère pas le retry, on inclut le 401 :
+onError: (error) => {
+  displayError(error, { includeUnauthorizedError: true });
+}
+```
+
+### mapFieldsErrors
+
+Mappe les violations de validation d'une réponse 400 sur les champs d'un formulaire React Hook Form. Appelée automatiquement par `handleServerErrors` sur les erreurs 400, mais peut aussi être utilisée directement.
+
+```tsx
+import { mapFieldsErrors } from '@/utils/errors';
+
+const errData = parseAxiosError<ValidationExceptionResponseDTO>(error, 'Erreur');
+mapFieldsErrors(setError, errData);
+// Applique violation.message sur chaque violation.field dans le formulaire
+// Si aucune violation, applique le message sur root
 ```
 
 ## Métadonnées (SEO)
