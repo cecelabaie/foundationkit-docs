@@ -48,9 +48,10 @@ function LoginComponent() {
 }
 ```
 
-**Note** : 
+**Note** :
 - **Pour les formulaires React Hook Form** : Dans ce projet, on utilise `mutate` avec `handleSubmit` et les callbacks `onSuccess`/`onError`.
-- **Pour les cas simples (bouton onClick sans formulaire)** : On peut utiliser `mutateAsync` avec try/catch si on a besoin d'attendre le résultat de la mutation (ex: dans un contexte, un guard, etc.).
+- **Pour les guards et useEffect** : Toujours utiliser `mutateAsync` avec `try/catch` dans une fonction `async`. Les callbacks `onSuccess`/`onError` passés à `mutate` sont liés à l'observer du composant — React StrictMode monte/démonte/remonte les composants en développement, ce qui drop silencieusement ces callbacks si la réponse API arrive après le démontage. `mutateAsync` retourne une Promise qui survit au cycle de vie du composant.
+- **Pour les cas simples (bouton onClick sans formulaire)** : On peut utiliser `mutateAsync` avec try/catch si on a besoin d'attendre le résultat de la mutation.
 
 Pour l'utilisation avec les formulaires, consultez [formulaires.md](./10-formulaires.md).
 
