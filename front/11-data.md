@@ -86,30 +86,26 @@ Pour plus de détails sur la gestion des erreurs et les autres utilitaires dispo
 
 **Fichier :** `src/config/queryClient.ts`
 
-Le `QueryClient` gère automatiquement le rafraîchissement de session et le retry.
+Le `QueryClient` configure la politique de retry des requêtes. La gestion des erreurs 401 est entièrement déléguée à l'interceptor Axios dans `src/config/httpClient.ts`.
 
-#### Gestion des 401 : `handleAuthError`
+#### Gestion des 401 : interceptor Axios dans `httpClient.ts`
 
-Une fonction `handleAuthError` est partagée entre le `QueryCache` et le `MutationCache`. Sur toute erreur 401 :
+La gestion des erreurs 401 se fait via un interceptor `AXIOS_INSTANCE.interceptors.response` défini dans `src/config/httpClient.ts`. Sur toute erreur 401 :
 
 1. Si la route est dans `ROUTES_WITHOUT_RETRY` → abandon immédiat (évite une boucle infinie sur `/auth/refresh-session` lui-même)
-2. Sinon → appel `refreshToken()`
-   - Succès : ré-exécution automatique de l'opération en échec (refetch query ou re-execute mutation)
+2. Si la requête a déjà été rejouée (`_retry`) → abandon immédiat
+3. Sinon → appel `refreshToken()`
+   - Succès : la requête originale est rejouée automatiquement par Axios
    - Échec : appel du callback `onAuthFailed`, qui efface l'utilisateur en cache (enregistré depuis `AuthContext`)
 
-Le refresh est **dédupliqué** via une `refreshPromise` singleton : si plusieurs requêtes échouent en 401 simultanément, un seul appel `POST /auth/refresh-session` est effectué. Toutes les opérations en attente reprennent ensuite.
+Le refresh est **dédupliqué** via une `refreshPromise` singleton : si plusieurs requêtes échouent en 401 simultanément, un seul appel `POST /auth/refresh-session` est effectué.
 
-Les callbacks sont enregistrés depuis `AuthContext` au montage :
+Le callback est enregistré depuis `AuthContext` au montage :
 
 ```tsx
 registerAuthFailedCallback(() => {
   queryClient.setQueryData(getUserControllerGetProfileQueryKey(), null);
 });
-
-registerRefreshCallbacks(
-  () => setIsRefreshingSession(true),
-  () => setIsRefreshingSession(false)
-);
 ```
 
 #### defaultOptions : politique de retry
@@ -133,7 +129,7 @@ const shouldRetry = (failureCount: number, error: unknown): boolean => {
 | Retry si 5xx / 408 | oui | oui |
 | Retry si statut inconnu | oui | oui |
 
-Les routes exclues de la logique 401 sont définies dans `src/constants/constants.ts` :
+Les routes exclues de la logique 401 (dans `httpClient.ts`) sont définies dans `src/constants/constants.ts` :
 
 ```tsx
 export const ROUTES_WITHOUT_RETRY = [

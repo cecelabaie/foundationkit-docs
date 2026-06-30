@@ -170,7 +170,7 @@ import { AlertCircleIcon } from 'lucide-react';
 `handleServerErrors` est la fonction à utiliser dans `onError` pour tous les formulaires. Elle dispatche automatiquement selon le code HTTP :
 
 - **400** : erreurs de champ (affichées sous chaque input via `mapFieldsErrors`)
-- **401** : silencieux par défaut car le QueryClient intercepte le 401, tente le refresh et rejoue la mutation automatiquement. L'utilisateur ne doit pas voir d'erreur dans ce cas.
+- **401** : silencieux par défaut car l'interceptor Axios de `httpClient.ts` intercepte le 401, tente le refresh et rejoue la requête automatiquement avant que React Query ne voie l'erreur. L'utilisateur ne doit pas voir d'erreur dans ce cas.
 - **Autres** : erreur sur `root` (affichée dans l'`Alert` du formulaire)
 
 ```tsx
@@ -183,7 +183,7 @@ onError: (error) => {
 
 **Exception : routes dans `ROUTES_WITHOUT_RETRY`**
 
-Pour les routes exclues du retry (ex: `/auth/login`), le QueryClient ne tente pas de refresh sur un 401 car un 401 sur ces routes signifie une vraie erreur métier (mauvais identifiants, token invalide...) et non une session expirée. Dans ce cas, il faut afficher l'erreur 401 explicitement :
+Pour les routes exclues du retry (ex: `/auth/login`), l'interceptor `httpClient.ts` ne tente pas de refresh sur un 401 car un 401 sur ces routes signifie une vraie erreur métier (mauvais identifiants, token invalide...) et non une session expirée. Dans ce cas, il faut afficher l'erreur 401 explicitement :
 
 ```tsx
 onError: (error) => {

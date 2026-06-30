@@ -112,7 +112,7 @@ Pour plus d'informations sur le système de traduction et son intégration avec 
 
 **Fichier :** `src/hooks/useFileFetch.ts`
 
-Récupère un fichier protégé via l'API (avec les cookies de session) et l'ouvre dans un nouvel onglet. Utilise `AXIOS_INSTANCE`, ce qui signifie que la gestion du refresh token s'applique : si la requête retourne 401, le `QueryClient` tente automatiquement de rafraîchir la session puis rejoue la requête. `isLoading` reste vrai pendant tout ce temps.
+Récupère un fichier protégé via l'API (avec les cookies de session) et l'ouvre dans un nouvel onglet. Utilise `AXIOS_INSTANCE`, ce qui signifie que la gestion du refresh token s'applique : si la requête retourne 401, l'interceptor Axios de `httpClient.ts` tente automatiquement de rafraîchir la session puis rejoue la requête. `isLoading` reste vrai pendant tout ce temps.
 
 ### Utilisation
 
@@ -139,7 +139,7 @@ function MyComponent() {
 
 **Fichier :** `src/hooks/useFileFetch.ts`
 
-Récupère un fichier protégé via l'API et déclenche son téléchargement avec un nom de fichier personnalisé. Comme `useFileOpen`, bénéficie du refresh token automatique via `AXIOS_INSTANCE`.
+Récupère un fichier protégé via l'API et déclenche son téléchargement avec un nom de fichier personnalisé. Comme `useFileOpen`, bénéficie du refresh token automatique via `AXIOS_INSTANCE` (interceptor de `httpClient.ts`).
 
 ### Utilisation
 

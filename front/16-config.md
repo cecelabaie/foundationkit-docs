@@ -75,52 +75,54 @@ Configuration d'Orval, l'outil qui génère automatiquement des hooks React Quer
 output: {
   mode: 'tags-split',
   target: 'src/api/generated',
-  schemas: 'src/api/generated/schemas',
-  client: 'react-query',
-  mock: false,
-  baseUrl: {
-    getBaseUrlFromSpecification: true,
+  schemas: {
+    path: 'src/api/generated/schemas',
+    type: 'typescript',
   },
+  client: 'react-query',
+  httpClient: 'axios',
+  mock: false,
+  baseUrl: '',
   // ...
 }
 ```
 
 - **target** : Chemin où les hooks seront générés
-- **schemas** : Chemin pour les interfaces TypeScript
+- **schemas** : Objet configurant le chemin et le type pour les interfaces TypeScript
 - **client** : Utilise React Query pour la gestion des requêtes et du cache
+- **httpClient** : Spécifie Axios comme client HTTP sous-jacent
 - **mock** : Désactive la génération de données fictives
-- **baseUrl** : Récupère l'URL de base depuis la spécification Swagger
+- **baseUrl** : Chaîne vide (l'URL de base est configurée dans `httpClient.ts` via `SERVER_URL`)
 
 ### Personnalisation avancée
 
 ```typescript
 override: {
-  query: {
-    useQuery: true,
-  },
+  query: {},
   enumGenerationType: 'enum',
-  mutator: './src/transformers/customMutator.ts',
+  mutator: './src/config/httpClient.ts',
 }
 ```
 
-- **useQuery** : Active la génération des hooks `useQuery`
 - **enumGenerationType** : Génère des énumérations TypeScript plutôt que des unions de chaînes
-- **mutator** : Utilise un client HTTP personnalisé (`customMutator.ts`) qui :
+- **mutator** : Utilise le client HTTP personnalisé (`httpClient.ts`) qui :
   - Configure Axios avec les credentials pour envoyer les cookies
+  - Gère automatiquement les erreurs 401 via un interceptor (refresh token + retry)
   - Gère l'annulation des requêtes
-  - Permet d'ajouter des intercepteurs globaux
 
 ### Génération de schémas Zod
 
 ```typescript
 apiZodSchemas: {
-  input: {
-    target: SWAGGER_JSON,
-  },
+  input: { target: SWAGGER_JSON },
   output: {
     client: 'zod',
     target: 'src/api/generated/zod',
     mode: 'tags-split',
+    schemas: {
+      path: 'src/api/generated/zod',
+      type: 'zod',
+    },
   },
 }
 ```
@@ -128,6 +130,7 @@ apiZodSchemas: {
 - **client** : Utilise Zod pour la validation des données
 - **target** : Chemin où les schémas Zod seront générés
 - **mode** : Organise également les schémas par tags API
+- **schemas** : Objet configurant le chemin et le type des schémas générés
 
 
 ## eslint.config.mjs

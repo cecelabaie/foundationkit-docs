@@ -388,7 +388,7 @@ export default function FeatureForm() {
 - `useZodI18n(methods)` est **obligatoire** dans chaque formulaire avec Zod
 - Pour la prop `required` sur les inputs, la dériver du schéma Zod plutôt que de la coder en dur : `required={!zSchema.shape.field.safeParse('').success}`. Ce pattern est fiable pour les champs `string` ; pour les champs d'un autre type (boolean, number…), `safeParse('')` échoue systématiquement : utiliser la valeur vide du type concerné (ex: `safeParse(false)` pour un boolean).
 - Le message affiché en `onSuccess` vient d'une clé de traduction frontend, pas de `response.message`
-- Gestion du 401 dans `onError` : utiliser `handleServerErrors(error, setError)` — le 401 est silencieux par défaut car le `MutationCache` gère refresh + retry automatiquement. Pour les routes dans `ROUTES_WITHOUT_RETRY` (login, reset-password…), un 401 est une vraie erreur métier : passer `{ includeUnauthorizedAlert: true }`.
+- Gestion du 401 dans `onError` : utiliser `handleServerErrors(error, setError)` — le 401 est silencieux par défaut car l'interceptor Axios de `httpClient.ts` gère refresh + retry automatiquement avant que React Query voie l'erreur. Pour les routes dans `ROUTES_WITHOUT_RETRY` (login, reset-password…), un 401 est une vraie erreur métier : passer `{ includeUnauthorizedAlert: true }`.
 - Utiliser `mutate` (avec callbacks) pour les formulaires, `mutateAsync` uniquement si un `await` est nécessaire
 - Utiliser `useAppRouter` à la place de `useRouter` (barre de progression)
 
@@ -510,7 +510,6 @@ export default function MyComponent() {
 |--------|------|-------|
 | `user` | `UserProfileDTO \| undefined` | Données de l'utilisateur connecté, `undefined` si non connecté |
 | `isLoadingUser` | `boolean` | Vrai pendant le premier chargement du profil |
-| `isRefreshingSession` | `boolean` | Vrai pendant un rafraîchissement de token en cours |
 | `refetchMe` | `() => Promise<...>` | Recharge les données utilisateur depuis l'API : à appeler après un login ou une mise à jour du profil |
 
 **`onSettled` : même comportement succès et erreur :**

@@ -31,7 +31,6 @@ Le `AuthContext` est le cœur du système d'authentification. Il fournit :
 |--------|------|-------------|
 | `user` | `UserProfileDTO \| undefined` | Données de l'utilisateur connecté, `undefined` si non connecté |
 | `isLoadingUser` | `boolean` | Vrai pendant le premier chargement du profil |
-| `isRefreshingSession` | `boolean` | Vrai pendant un rafraîchissement de token en cours |
 | `refetchMe` | `function` | Force un rechargement du profil utilisateur depuis l'API |
 
 ### Cycle de vie de la session
@@ -39,28 +38,23 @@ Le `AuthContext` est le cœur du système d'authentification. Il fournit :
 Au montage, `AuthContext` effectue un unique appel `GET /user/profile` via React Query pour déterminer si l'utilisateur est connecté. Aucune logique de flag localStorage ou de validate-session n'est nécessaire : la requête profil sert directement de vérification d'authentification.
 
 - Si la requête réussit → `user` est alimenté, l'application s'affiche
-- Si la requête retourne 401 → le `QueryClient` tente un refresh automatique (voir [data.md](./11-data.md))
+- Si la requête retourne 401 → l'interceptor Axios dans `httpClient.ts` tente un refresh automatique (voir [data.md](./11-data.md))
   - Refresh réussi → la requête profil est relancée
   - Refresh échoué → `onAuthFailed` est appelé, ce qui place `null` en cache, `user` devient `undefined`
 
 La query profil est configurée avec `retry: false` et `staleTime: Infinity` pour éviter tout appel parasite après un `setQueryData(null)`.
 
-### Enregistrement des callbacks QueryClient
+### Enregistrement du callback d'échec d'authentification
 
-`AuthContext` enregistre deux séries de callbacks dans le `QueryClient` au montage :
+`AuthContext` enregistre un callback dans `httpClient` au montage via `registerAuthFailedCallback` (importé depuis `src/config/httpClient.ts`) :
 
 ```tsx
 registerAuthFailedCallback(() => {
   queryClient.setQueryData(getUserControllerGetProfileQueryKey(), null);
 });
-
-registerRefreshCallbacks(
-  () => setIsRefreshingSession(true),
-  () => setIsRefreshingSession(false)
-);
 ```
 
-Ces callbacks permettent au `QueryClient` de notifier l'`AuthContext` sans dépendance circulaire.
+Ce callback est appelé par l'interceptor Axios de `httpClient.ts` lorsqu'un refresh de token échoue. Il efface les données utilisateur du cache React Query, ce qui déconnecte l'utilisateur sans dépendance circulaire entre `AuthContext` et `httpClient`.
 
 ## Guards de protection
 
@@ -125,7 +119,7 @@ Pendant la vérification d'authentification, un composant `PageLoader` est affic
 
 > **Important** : Cette protection est implémentée au niveau du client (JavaScript). Le code source des pages reste accessible dans le build. Toutes données sensibles doivent venir de l'API et ne doivent pas être stockées côté client.
 
-## Intégration avec React Query
+## Intégration avec React Query et httpClient
 
-Le `QueryClient` est configuré pour gérer automatiquement les erreurs d'authentification (401).
-Pour plus de détails sur la configuration de React Query, consultez [data.md](./11-data.md).
+La gestion des erreurs 401 est assurée par l'interceptor Axios dans `src/config/httpClient.ts`. Le `QueryClient` (`src/config/queryClient.ts`) configure uniquement la politique de retry pour les erreurs transitoires (5xx, 408).
+Pour plus de détails, consultez [data.md](./11-data.md).

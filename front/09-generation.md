@@ -24,7 +24,7 @@ La configuration se trouve dans `orval.config.ts` à la racine du projet :
 - **SWAGGER_JSON** : URL vers le fichier OpenAPI, incluant le token : `{API_URL}/api-json?token={SWAGGER_TOKEN}`. Chargé depuis le premier fichier trouvé dans l'ordre : `.env.production`, `.env.local`, `.env`
 - **mode: 'tags-split'** : Génère des fichiers séparés par tags OpenAPI
 - **client: 'react-query'** : Génère des hooks React Query
-- **mutator personnalisé** : Utilise un client Axios personnalisé
+- **mutator** : Utilise le client HTTP `src/config/httpClient.ts` (Axios + interceptor 401 + refresh token)
 - **apiZodSchemas** : Configuration pour générer les schémas Zod
 
 ## Structure des fichiers générés
@@ -53,39 +53,15 @@ src/api/generated/
 
 ## Client HTTP personnalisé
 
-Le projet utilise un client Axios personnalisé défini dans `src/transformers/customMutator.ts` :
+Le projet utilise un client HTTP personnalisé défini dans `src/config/httpClient.ts`. Il est utilisé par Orval comme mutator pour toutes les requêtes générées.
 
-```typescript
-import { SERVER_URL } from '@/constants/constants';
-import Axios, { AxiosRequestConfig } from 'axios';
+Responsabilités :
+- Configure `AXIOS_INSTANCE` avec l'URL de base (`SERVER_URL`) et l'envoi des cookies (`withCredentials`)
+- Interceptor 401 : tente un refresh de session, rejoue la requête en cas de succès, appelle `onAuthFailed` en cas d'échec — le refresh est dédupliqué via une `refreshPromise` singleton
+- Expose `registerAuthFailedCallback` pour que `AuthContext` puisse réagir à un échec d'authentification
+- Supporte l'annulation des requêtes React Query via `CancelToken`
 
-export const AXIOS_INSTANCE = Axios.create({
-  baseURL: SERVER_URL,
-  withCredentials: true, // Active l'envoi des cookies
-});
-
-export default async function customMutator<T>(config: AxiosRequestConfig): Promise<T> {
-  const source = Axios.CancelToken.source();
-
-  const promise = AXIOS_INSTANCE({
-    ...config,
-    cancelToken: source.token,
-  }).then(({ data }) => data);
-
-  // Support pour l'annulation des requêtes
-  promise.cancel = () => {
-    source.cancel('Query was cancelled by React Query');
-  };
-
-  return promise;
-}
-```
-
-Ce mutator personnalisé :
-- Configure l'URL de base pour toutes les requêtes
-- Active l'envoi des cookies pour l'authentification
-- Supporte l'annulation des requêtes avec React Query
-- Extrait automatiquement les données de la réponse
+Pour les détails sur la gestion des 401 et le refresh, voir [data.md](./11-data.md).
 
 ## Types générés
 

@@ -110,7 +110,7 @@ onError: (error) => {
 Fonction centrale pour la gestion des erreurs dans les formulaires React Hook Form. Dispatche automatiquement les erreurs selon leur type :
 
 - **400** → erreurs de champ via `mapFieldsErrors` (affichage sous chaque input)
-- **401** → `root` error uniquement si `includeUnauthorizedAlert: true` + callback `onUnauthorized` optionnel (sinon silencieux car le `QueryClient` gère le refresh)
+- **401** → `root` error uniquement si `includeUnauthorizedAlert: true` + callback `onUnauthorized` optionnel (sinon silencieux car l'interceptor Axios de `httpClient.ts` gère le refresh et le retry)
 - **Autres** → `root` error (affiché dans l'`Alert` du formulaire)
 
 ```tsx
@@ -142,7 +142,7 @@ handleServerErrors(error, setError, {
 
 ### displayError
 
-Affiche une erreur dans un toast Sonner. Ignore les 401 par défaut car le `QueryClient` se charge du refresh et du retry automatiquement. A utiliser hors formulaire (guards, callbacks sans formulaire).
+Affiche une erreur dans un toast Sonner. Ignore les 401 par défaut car l'interceptor Axios de `httpClient.ts` se charge du refresh et du retry automatiquement. A utiliser hors formulaire (guards, callbacks sans formulaire).
 
 ```tsx
 import { displayError } from '@/utils/errors';
